@@ -1,0 +1,194 @@
+﻿[pass] Tuesday 10am offers this afternoon then tomorrow morning
+       fed in  : Joe: Mon-Fri 8am-5pm, 2h windows, 4h notice, max 3/day, 2 options. Pretend it is Tuesday 11 Aug, 10:00am
+       expected: ['today 2-4pm', 'tomorrow 8-10am']
+       got     : ['today 2-4pm', 'tomorrow 8-10am']
+
+[pass] Friday 4pm skips the weekend and offers Monday
+       fed in  : Joe: Mon-Fri 8am-5pm, 2h windows, 4h notice, max 3/day, 2 options. Pretend it is Friday 14 Aug, 4:00pm
+       expected: ['Monday 8-10am', 'Monday 10am-12pm']
+       got     : ['Monday 8-10am', 'Monday 10am-12pm']
+
+[pass] Saturday morning knows he doesn't work weekends
+       fed in  : Joe: Mon-Fri 8am-5pm, 2h windows, 4h notice, max 3/day, 2 options. Pretend it is Saturday 15 Aug, 9:00am
+       expected: ['Monday 8-10am', 'Monday 10am-12pm']
+       got     : ['Monday 8-10am', 'Monday 10am-12pm']
+
+[pass] 11pm doesn't offer the middle of the night
+       fed in  : Joe: Mon-Fri 8am-5pm, 2h windows, 4h notice, max 3/day, 2 options. Pretend it is Tuesday 11 Aug, 11:00pm
+       expected: ['tomorrow 8-10am', 'tomorrow 10am-12pm']
+       got     : ['tomorrow 8-10am', 'tomorrow 10am-12pm']
+
+[pass] 6am waits for opening time plus his notice period
+       fed in  : Joe: Mon-Fri 8am-5pm, 2h windows, 4h notice, max 3/day, 2 options. Pretend it is Tuesday 11 Aug, 6:00am (before he opens)
+       expected: ['today 10am-12pm', 'today 12-2pm']
+       got     : ['today 10am-12pm', 'today 12-2pm']
+
+[pass] Friday 2pm - the 4 hour notice period crosses the weekend
+       fed in  : Joe: Mon-Fri 8am-5pm, 2h windows, 4h notice, max 3/day, 2 options. Pretend it is Friday 14 Aug, 2:00pm. 4 hours later is 6pm, after he has finished
+       expected: ['Monday 8-10am', 'Monday 10am-12pm']
+       got     : ['Monday 8-10am', 'Monday 10am-12pm']
+
+[pass] never offers before his day starts or after it ends
+       fed in  : Asked for 12 windows in a row from Tuesday 6am. Got: today 10am-12pm, today 12-2pm, today 2-4pm, tomorrow 8-10am, tomorrow 10am-12pm, tomorrow 12-2pm, Thursday 8-10am, Thursday 10am-12pm, Thursday 12-2pm, Friday 8-10am, Friday 10am-12pm, Friday 12-2pm
+       expected: yes
+       got     : yes
+
+[pass] never offers a Saturday or Sunday
+       fed in  : The same 12 windows, checking the day of the week on each
+       expected: yes
+       got     : yes
+
+[pass] never offers sooner than his 4 hours notice
+       fed in  : The same 12 windows. Earliest allowed is Tuesday 10:00am
+       expected: yes
+       got     : yes
+
+[pass] respects the 3-per-day cap
+       fed in  : The same 12 windows, counted per day: {'2026-08-11': 3, '2026-08-12': 3, '2026-08-13': 3, '2026-08-14': 3}
+       expected: 3
+       got     : 3
+
+[pass] every window is exactly 2 hours long
+       fed in  : The same 12 windows, measuring start to finish on each
+       expected: {2}
+       got     : {2}
+
+[pass] Maria DOES work Saturdays, so she gets offered Saturday
+       fed in  : Maria: Mon-SAT 7am-7pm, 3h windows, 2h notice, max 2/day, 3 options. Pretend it is Saturday 15 Aug, 9:00am - the exact same moment where Joe was pushed to Monday
+       expected: today 11am-2pm
+       got     : today 11am-2pm
+
+[pass] Maria is offered 3 options, not Joe's 2
+       fed in  : Her settings say options_to_offer = 3. She got: ['today 11am-2pm', 'today 2-5pm', 'Monday 7-10am']
+       expected: 3
+       got     : 3
+
+[pass] Maria's windows are 3 hours long, not 2
+       fed in  : Her settings say window_hours = 3
+       expected: {3}
+       got     : {3}
+
+[pass] Maria's 2 hour notice is shorter than Joe's 4
+       fed in  : First window starts today 11am-2pm; 9am + 2h notice = 11am at the earliest
+       expected: yes
+       got     : yes
+
+[pass] Maria's cap is 2 a day, not Joe's 3
+       fed in  : Asked for 8 windows. Counted per day: {'2026-08-15': 2, '2026-08-17': 2, '2026-08-18': 2, '2026-08-19': 2}
+       expected: 2
+       got     : 2
+
+[pass] normal lead with an email address gets emailed
+       fed in  : A lead with name Ann and email a@b.com, not an emergency
+       expected: EMAIL_CUSTOMER
+       got     : EMAIL_CUSTOMER
+
+[pass] lead with only a phone number means the plumber must call
+       fed in  : A lead with a phone number but NO email address
+       expected: ALERT_OWNER_CALL
+       got     : ALERT_OWNER_CALL
+
+[pass] emergency with an email gets both a reply AND an alert
+       fed in  : A lead marked emergency, with an email address
+       expected: EMAIL_AND_ALERT
+       got     : EMAIL_AND_ALERT
+
+[pass] emergency with no email means call them, now
+       fed in  : A lead marked emergency, phone only, no email address
+       expected: ALERT_OWNER_CALL
+       got     : ALERT_OWNER_CALL
+
+[pass] junk mail produces nothing at all
+       fed in  : An email the parser decided was junk
+       expected: NOTHING
+       got     : NOTHING
+
+[pass] an auto-reply produces nothing at all
+       fed in  : An out-of-office or bounce message
+       expected: NOTHING
+       got     : NOTHING
+
+[pass] a customer replying to us is not treated as a new lead
+       fed in  : A customer replying inside a conversation we already started
+       expected: NOTHING
+       got     : NOTHING
+
+[pass] 'leak' reads fine on its own - no 'issue' added
+       fed in  : A lead whose job type is 'Leak'
+       expected: Re: your leak
+       got     : Re: your leak
+
+[pass] greets him by first name only
+       fed in  : The same lead. Opening line of the email was: "Hi John,"
+       expected: yes
+       got     : yes
+
+[pass] 'shower' alone sounds clipped, so becomes 'shower issue'
+       fed in  : A lead whose job type is just 'Shower' - a bare appliance name
+       expected: Re: your shower issue
+       got     : Re: your shower issue
+
+[pass] a job that already describes work is left alone
+       fed in  : A lead whose job type is 'Water Heater Repair' - already a piece of work, so 'issue' must NOT be added
+       expected: Re: your water heater repair
+       got     : Re: your water heater repair
+
+[pass] unknown job never produces 'your your'
+       fed in  : A lead with NO job type at all - this is what produced the old bug 'Re: your your plumbing job request'
+       expected: Re: your plumbing job
+       got     : Re: your plumbing job
+
+[pass] emergency email says it's urgent
+       fed in  : The same emergency lead. Email body was:
+            Hi Tom,
+            
+            Thanks for reaching out about your plumbing job - that sounds urgent, so I've flagged it straight away.
+            
+            Someone from Joe's Plumbing will call you shortly to get to you as fast as possible.
+            
+            - Joe's Plumbing
+       expected: yes
+       got     : yes
+
+[pass] emergency email does NOT offer appointment times
+       fed in  : The same emergency email - a flooding customer must never be asked to pick between Tuesday and Wednesday
+       expected: yes
+       got     : yes
+
+[pass] asks for the zip code when the form didn't give an address
+       fed in  : A lead where the form captured no address. Joe's settings say to ask "what's your zip code?"
+       expected: yes
+       got     : yes
+
+[pass] asks NOTHING when the form already told us everything
+       fed in  : A lead where the form gave both address and urgency - asking again would insult the customer
+       expected: yes
+       got     : yes
+
+[pass] never asks two questions at once
+       fed in  : A lead missing BOTH address and urgency. Only one question allowed
+       expected: yes
+       got     : yes
+
+[pass] signs off with the right business name
+       fed in  : The same lead, but run through Maria's settings instead of Joe's. Sign-off line was: "- Maria's Heating & Air"
+       expected: yes
+       got     : yes
+
+[pass] emergency alert tells the plumber WHY he's being interrupted
+       fed in  : Tom, flooding basement, phone only. The plumber's alert said:
+              Name     : Tom
+              Phone    : 312-555-9034
+              Job      : Flooding
+              Said     : "My basement is flooding right now."
+       expected: yes
+       got     : yes
+
+[pass] emergency alert is clearly marked as an emergency
+       fed in  : The same alert. Its headline was: "EMERGENCY - CALL NOW"
+       expected: yes
+       got     : yes
+
+======================================================================
+  36 passed, 0 failed, 36 total
+======================================================================

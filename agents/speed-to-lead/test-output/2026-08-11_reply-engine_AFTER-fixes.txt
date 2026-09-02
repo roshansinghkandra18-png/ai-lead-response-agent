@@ -1,0 +1,273 @@
+﻿Pretending it is Tuesday 11 August 2026, 10:00AM
+Client: Joe's Plumbing
+Works mon,tue,wed,thu,fri 08:00-17:00, 4h minimum notice
+
+==================================================================
+1. Plain text form (Contact Form 7 style)
+==================================================================
+
+  TO      : jsmith@gmail.com
+  SUBJECT : Re: your water heater repair request
+  --------------------------------------------------------------
+  Hi John,
+  
+  Thanks for reaching out about your water heater repair.
+  
+  I can get someone out to you:
+    1 - today 2-4pm
+    2 - tomorrow 8-10am
+  
+  Just reply with 1 or 2 and I'll lock it in.
+  
+  Also, what's your zip code?
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+==================================================================
+2. HTML table form (WPForms style)
+==================================================================
+
+  >>> TO THE PLUMBER: CALL THIS PERSON - no email address
+  Name     : Maria Gonzalez
+  Phone    : 555-338-2011
+  Job      : Drain Cleaning / Clog
+  Address  : 44 Oak Ave, Tampa FL 33601
+  Urgency  : Within 24 hours
+
+==================================================================
+4. CASE 1 - no labels at all, just a person talking
+==================================================================
+
+  TO      : john.smith@gmail.com
+  SUBJECT : Re: your leak request
+  --------------------------------------------------------------
+  Hi John,
+  
+  Thanks for reaching out about your leak.
+  
+  I can get someone out to you:
+    1 - today 2-4pm
+    2 - tomorrow 8-10am
+  
+  Just reply with 1 or 2 and I'll lock it in.
+  
+  Also, what's your zip code?
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+==================================================================
+6. CASE 3 - a forwarded enquiry
+==================================================================
+
+  >>> TO THE PLUMBER: CALL THIS PERSON - no email address
+  Name     : Dave Wilson
+  Phone    : (555) 771-2093
+  Job      : Toilet Installation
+
+==================================================================
+7. CASE 4 - marketplace lead (Thumbtack style)
+==================================================================
+
+  TO      : leads@thumbtack.com
+  SUBJECT : Re: your water heater installation request
+  --------------------------------------------------------------
+  Hi John,
+  
+  Thanks for reaching out about your water heater installation.
+  
+  I can get someone out to you:
+    1 - today 2-4pm
+    2 - tomorrow 8-10am
+  
+  Just reply with 1 or 2 and I'll lock it in.
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+==================================================================
+8. CASE 5 - colons inside the customer's own message
+==================================================================
+
+  >>> TO THE PLUMBER: EMERGENCY - CALL NOW
+  Name     : Sarah Chen
+  Phone    : 555-889-4412
+  Job      : Burst Pipe
+  Urgency  : whenever you can, honestly
+  Said     : "Here's the situation: Problem: burst pipe under the sink"
+
+==================================================================
+11. CASE 8 - unknown extra fields we've never seen
+==================================================================
+
+  >>> TO THE PLUMBER: CALL THIS PERSON - no email address
+  Name     : Robert Lee
+  Phone    : (555) 220-7788
+  Job      : Water Heater Repair
+
+==================================================================
+12. Angi lead - real question wording, name split in two
+==================================================================
+
+  TO      : mtorres@example.com
+  SUBJECT : Re: your water heater request
+  --------------------------------------------------------------
+  Hi Michael,
+  
+  Thanks for reaching out about your water heater.
+  
+  I can get someone out to you:
+    1 - today 2-4pm
+    2 - tomorrow 8-10am
+  
+  Just reply with 1 or 2 and I'll lock it in.
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+==================================================================
+13. Thumbtack lead - phone only, flooded = Yes
+==================================================================
+
+  >>> TO THE PLUMBER: EMERGENCY - CALL NOW
+  Name     : Dana R.
+  Phone    : (813) 555-0147
+  Job      : Flooding
+  Address  : 33612
+  Urgency  : Right away
+  Property : Single family home
+  Affected : Water heater, washing machine
+  Said     : "Water everywhere in the basement."
+
+==================================================================
+15. Squarespace form - first and last name in separate boxes
+==================================================================
+
+  TO      : abrooks@example.com
+  SUBJECT : Re: your shower request
+  --------------------------------------------------------------
+  Hi Angela,
+  
+  Thanks for reaching out about your shower.
+  
+  I can get someone out to you:
+    1 - today 2-4pm
+    2 - tomorrow 8-10am
+  
+  Just reply with 1 or 2 and I'll lock it in.
+  
+  Also, what's your zip code?
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+==================================================================
+16. Gravity Forms - HTML table, label and value in one row
+==================================================================
+
+  >>> TO THE PLUMBER: CALL THIS PERSON - no email address
+  Name     : Priya Nair
+  Phone    : 408.555.7712
+  Job      : Garbage Disposal Replacement
+  Said     : "Disposal jammed and humming."
+
+==================================================================
+17. Emergency written in plain words, no form at all
+==================================================================
+
+  TO      : tom.baker@example.com
+  SUBJECT : Re: your flooding request
+  --------------------------------------------------------------
+  Hi Tom,
+  
+  Thanks for reaching out about your flooding - that sounds urgent, so I've flagged it straight away.
+  
+  Someone from Joe's Plumbing will call you shortly to get to you as fast as possible.
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+  >>> TO THE PLUMBER: EMERGENCY - CALL NOW
+  Name     : Tom
+  Phone    : 312-555-9034
+  Job      : Flooding
+  Said     : "Hi, this is Tom. My basement is flooding right now. Please help. You can reach me on 312-555-9034."
+  (a holding reply has already gone to the customer)
+
+==================================================================
+18. Routine job - must NOT be flagged as an emergency
+==================================================================
+
+  >>> TO THE PLUMBER: CALL THIS PERSON - no email address
+  Name     : Ellen Park
+  Phone    : (503) 555-1188
+  Job      : Faucet Installation
+  Urgency  : Sometime next month
+  Said     : "Would like a quote for replacing two bathroom faucets."
+
+==================================================================
+19. Messy form - stray spaces and SHOUTING labels
+==================================================================
+
+  >>> TO THE PLUMBER: CALL THIS PERSON - no email address
+  Name     : Carla Diaz
+  Phone    : (786) 555-3321
+  Job      : Sewer Line Repair
+
+==================================================================
+22. Someone else's email inside the message
+==================================================================
+
+  TO      : ghall@example.com
+  SUBJECT : Re: your toilet repair request
+  --------------------------------------------------------------
+  Hi Greg,
+  
+  Thanks for reaching out about your toilet repair.
+  
+  I can get someone out to you:
+    1 - today 2-4pm
+    2 - tomorrow 8-10am
+  
+  Just reply with 1 or 2 and I'll lock it in.
+  
+  Also, what's your zip code?
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+==================================================================
+23. No labels - 'my name is' in the middle of a sentence
+==================================================================
+
+  TO      : jenny.k@example.com
+  SUBJECT : Re: your sump pump request
+  --------------------------------------------------------------
+  Hi Jenny,
+  
+  Thanks for reaching out about your sump pump.
+  
+  I can get someone out to you:
+    1 - today 2-4pm
+    2 - tomorrow 8-10am
+  
+  Just reply with 1 or 2 and I'll lock it in.
+  
+  Also, what's your zip code?
+  
+  - Joe's Plumbing
+  --------------------------------------------------------------
+
+==================================================================
+24. HTML form using &amp; instead of a plain ampersand
+==================================================================
+
+  >>> TO THE PLUMBER: CALL THIS PERSON - no email address
+  Name     : Luis Ortega
+  Phone    : 305-555-6620
+  Job      : Drain & Sewer Cleaning
+
+==================================================================
+  8 customer emails written, 10 alerts to the plumber, 7 ignored
+==================================================================

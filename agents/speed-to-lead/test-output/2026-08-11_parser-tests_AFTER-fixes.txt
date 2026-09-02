@@ -1,0 +1,165 @@
+﻿[pass] 1. Plain text form (Contact Form 7 style)
+       status : LEAD
+       name         : John Smith
+       phone        : (555) 402-8871
+       email        : jsmith@gmail.com
+       job_type     : Water Heater Repair
+       would ask: address, urgency
+
+[pass] 2. HTML table form (WPForms style)
+       status : LEAD
+       name         : Maria Gonzalez
+       phone        : 555-338-2011
+       job_type     : Drain Cleaning / Clog
+       address      : 44 Oak Ave, Tampa FL 33601
+       urgency      : Within 24 hours
+
+[pass] 3. A newsletter, not a lead
+       status : SKIP_NOT_LEAD  (not enough to identify a genuine enquiry)
+
+[pass] 4. CASE 1 - no labels at all, just a person talking
+       status : LEAD
+       name         : John
+       phone        : 555-402-8871
+       email        : john.smith@gmail.com
+       job_type     : Leak
+       would ask: address, urgency
+
+[pass] 5. CASE 2 - customer replying inside our own thread
+       status : THREAD_REPLY  (reply inside an existing conversation)
+
+[pass] 6. CASE 3 - a forwarded enquiry
+       status : LEAD
+       name         : Dave Wilson
+       phone        : (555) 771-2093
+       job_type     : Toilet Installation
+       would ask: address, urgency
+
+[pass] 7. CASE 4 - marketplace lead (Thumbtack style)
+       status : LEAD
+       name         : John S.
+       email        : leads@thumbtack.com
+       job_type     : Water heater installation
+       address      : Tampa, FL 33601
+       urgency      : Within a week
+
+[pass] 8. CASE 5 - colons inside the customer's own message
+       status : LEAD
+       *** EMERGENCY - alert the plumber, do not book ***
+       name         : Sarah Chen
+       phone        : 555-889-4412
+       job_type     : Burst Pipe
+       urgency      : whenever you can, honestly
+       would ask: address
+
+[pass] 9. CASE 6 - out-of-office auto-reply (MUST stay silent)
+       status : SKIP_AUTO  (machine-generated message)
+
+[pass] 10. CASE 7 - spam / phishing (MUST stay silent)
+       status : SKIP_NOT_LEAD  (not enough to identify a genuine enquiry)
+
+[pass] 11. CASE 8 - unknown extra fields we've never seen
+       status : LEAD
+       name         : Robert Lee
+       phone        : (555) 220-7788
+       job_type     : Water Heater Repair
+       would ask: address, urgency
+
+[pass] 12. Angi lead - real question wording, name split in two
+       status : LEAD
+       name         : Michael Torres
+       phone        : (614) 555-2201
+       email        : mtorres@example.com
+       job_type     : Water Heater
+       address      : 812 Maple St, Columbus OH 43004
+       urgency      : Within a week
+       property_type: Home
+
+[pass] 13. Thumbtack lead - phone only, flooded = Yes
+       status : LEAD
+       *** EMERGENCY - alert the plumber, do not book ***
+       name         : Dana R.
+       phone        : (813) 555-0147
+       job_type     : Flooding
+       address      : 33612
+       urgency      : Right away
+       property_type: Single family home
+       appliances   : Water heater, washing machine
+
+[pass] 14. Google Local Services - just a link to their dashboard
+       status : NEEDS_REVIEW  (lead from a marketplace we can't read fully)
+       would ask: address, urgency
+
+[pass] 15. Squarespace form - first and last name in separate boxes
+       status : LEAD
+       name         : Angela Brooks
+       phone        : 704-555-8890
+       email        : abrooks@example.com
+       job_type     : Shower
+       would ask: address, urgency
+
+[pass] 16. Gravity Forms - HTML table, label and value in one row
+       status : LEAD
+       name         : Priya Nair
+       phone        : 408.555.7712
+       job_type     : Garbage Disposal Replacement
+       would ask: address, urgency
+
+[pass] 17. Emergency written in plain words, no form at all
+       status : LEAD
+       *** EMERGENCY - alert the plumber, do not book ***
+       name         : Tom
+       phone        : 312-555-9034
+       email        : tom.baker@example.com
+       job_type     : Flooding
+       would ask: address, urgency
+
+[pass] 18. Routine job - must NOT be flagged as an emergency
+       status : LEAD
+       name         : Ellen Park
+       phone        : (503) 555-1188
+       job_type     : Faucet Installation
+       urgency      : Sometime next month
+       would ask: address
+
+[pass] 19. Messy form - stray spaces and SHOUTING labels
+       status : LEAD
+       name         : Carla Diaz
+       phone        : (786) 555-3321
+       job_type     : Sewer Line Repair
+       would ask: address, urgency
+
+[pass] 20. Bounce message - mail could not be delivered
+       status : SKIP_AUTO  (machine-generated message)
+
+[pass] 21. Yelp quote request - details locked in their app
+       status : NEEDS_REVIEW  (lead from a marketplace we can't read fully)
+       email        : leads@yelp.com
+       would ask: address, urgency
+
+[pass] 22. Someone else's email inside the message
+       status : LEAD
+       name         : Greg Hall
+       phone        : (206) 555-4412
+       email        : ghall@example.com
+       job_type     : Toilet Repair
+       would ask: address, urgency
+
+[pass] 23. No labels - 'my name is' in the middle of a sentence
+       status : LEAD
+       name         : Jenny Kowalski
+       phone        : 617-555-2245
+       email        : jenny.k@example.com
+       job_type     : Sump Pump
+       would ask: address, urgency
+
+[pass] 24. HTML form using &amp; instead of a plain ampersand
+       status : LEAD
+       name         : Luis Ortega
+       phone        : 305-555-6620
+       job_type     : Drain & Sewer Cleaning
+       would ask: address, urgency
+
+==============================================================
+  24 passed, 0 failed, 24 total
+==============================================================

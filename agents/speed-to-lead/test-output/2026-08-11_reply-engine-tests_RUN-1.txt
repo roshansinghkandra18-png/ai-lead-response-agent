@@ -1,0 +1,39 @@
+﻿[pass] Tuesday 10am offers this afternoon then tomorrow morning
+[pass] Friday 4pm skips the weekend and offers Monday
+[pass] Saturday morning knows he doesn't work weekends
+[pass] 11pm doesn't offer the middle of the night
+[pass] 6am waits for opening time plus his notice period
+[pass] Friday 2pm - the 4 hour notice period crosses the weekend
+[pass] never offers before his day starts or after it ends
+[pass] never offers a Saturday or Sunday
+[pass] never offers sooner than his 4 hours notice
+[pass] respects the 3-per-day cap
+[pass] every window is exactly 2 hours long
+[pass] Maria DOES work Saturdays, so she gets offered Saturday
+[pass] Maria is offered 3 options, not Joe's 2
+[pass] Maria's windows are 3 hours long, not 2
+[pass] Maria's 2 hour notice is shorter than Joe's 4
+[pass] Maria's cap is 2 a day, not Joe's 3
+[pass] normal lead with an email address gets emailed
+[pass] lead with only a phone number means the plumber must call
+[pass] emergency with an email gets both a reply AND an alert
+[pass] emergency with no email means call them, now
+[pass] junk mail produces nothing at all
+[pass] an auto-reply produces nothing at all
+[pass] a customer replying to us is not treated as a new lead
+[pass] 'leak' reads fine on its own - no 'issue' added
+[pass] greets him by first name only
+[pass] 'shower' alone sounds clipped, so becomes 'shower issue'
+[pass] a job that already describes work is left alone
+[pass] unknown job never produces 'your your'
+[pass] emergency email says it's urgent
+[pass] emergency email does NOT offer appointment times
+[pass] asks for the zip code when the form didn't give an address
+[pass] asks NOTHING when the form already told us everything
+[pass] never asks two questions at once
+[pass] signs off with the right business name
+[pass] emergency alert tells the plumber WHY he's being interrupted
+[pass] emergency alert is clearly marked as an emergency
+==================================================================
+  36 passed, 0 failed, 36 total
+==================================================================

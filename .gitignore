@@ -1,0 +1,58 @@
+# Secrets — never commit these.
+# example.env is the ONE env file that IS committed (fake values only).
+.env
+.env.*
+!example.env
+*.pem
+*.key
+credentials.json
+service-account*.json
+
+# Client data — anything real a client gave us.
+client-data/
+**/client-data/
+*.csv
+*.xlsx
+
+# ...with ONE deliberate exception. zipcodes.csv is public US postal data
+# (ZIP code -> latitude/longitude), not client data, and the agent's distance
+# calculations do not work without it. Written as the full exact path so it
+# can never accidentally let a different CSV through - any new CSV appearing
+# anywhere is still blocked by the rule above.
+!agents/speed-to-lead/zipcodes.csv
+
+# Real customers' details captured while the agent runs.
+replies-it-wrote.txt
+needs_review.log
+
+# The agent's own memory of which emails it has already answered.
+# Belongs to the machine it runs on, not to the project. Committing it would
+# hand one client's message history to the next.
+already-handled.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.next/
+dist/
+build/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/

@@ -1,0 +1,3213 @@
+======================================================================
+  SPEED-TO-LEAD AGENT - FULL TEST RESULTS
+  Run on 2 September 2026 at 05:27PM
+======================================================================
+
+This file contains every test we run on the agent, what was fed
+into each one, what we expected back, and what actually came back.
+
+There are three suites:
+  PART 1  - the PARSER      : does it READ an email correctly?
+  PART 2  - the REPLY ENGINE: does it ANSWER one correctly?
+  PART 2B - the DIARY       : does it know where the customer
+                              is and when the plumber is free?
+  PART 3 - the WHOLE AGENT : does it work on REAL email, sent by
+                             hand through Gmail?
+
+Parts 1 and 2 are rewritten by run_all_tests.py every time it runs.
+Part 3 is written by hand and is carried across untouched.
+
+======================================================================
+  PART 1 - THE PARSER
+  Feeds the agent 24 different emails and checks what it
+  understood from each one.
+======================================================================
+
+[pass] 1. Plain text form (Contact Form 7 style)
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: John Smith
+            Phone: (555) 402-8871
+            Email: jsmith@gmail.com
+            Service Needed: Water Heater Repair
+            Message: Water heater started leaking last night, there is water
+            on the basement floor. Need someone soon.
+       expected: status LEAD; name "John Smith"; job_type "Water Heater Repair"; email "jsmith@gmail.com"
+       got     : status LEAD; name "John Smith"; job_type "Water Heater Repair"; email "jsmith@gmail.com"
+       also    : phone "(555) 402-8871"; would ask for: address, urgency
+
+[pass] 2. HTML table form (WPForms style)
+       fed in  : an email that reads -
+            <html><body><table>
+            <tr><td><strong>Your Name</strong></td></tr><tr><td>Maria Gonzalez</td></tr>
+            <tr><td><strong>Best Number</strong></td></tr><tr><td>555-338-2011</td></tr>
+            <tr><td><strong>Service Address</strong></td></tr><tr><td>44 Oak Ave, Tampa FL 33601</td></tr>
+            <tr><td><strong>Service Type</strong></td></tr><tr><td>Drain Cleaning / Clog</td></tr>
+            <tr><td><strong>When do you need service?</strong></td></tr><tr><td>Within 24 hours</td></tr>
+            </table></body></html>
+       expected: status LEAD; name "Maria Gonzalez"; job_type "Drain Cleaning / Clog"
+       got     : status LEAD; name "Maria Gonzalez"; job_type "Drain Cleaning / Clog"
+       also    : phone "555-338-2011"; address "44 Oak Ave, Tampa FL 33601"; urgency "Within 24 hours"
+
+[pass] 3. A newsletter, not a lead
+       fed in  : an email that reads -
+            From: newsletter@plumbingsupply.com
+            Subject: August deals on copper fittings
+            
+            Hi there,
+            Our summer sale is on. Message us to learn more about bulk pricing.
+       expected: status SKIP_NOT_LEAD
+       got     : status SKIP_NOT_LEAD
+                 (reason: not enough to identify a genuine enquiry)
+
+[pass] 4. CASE 1 - no labels at all, just a person talking
+       fed in  : an email that reads -
+            From: john.smith@gmail.com
+            Subject: help
+            
+            Hi, I'm John. My kitchen sink is leaking pretty bad.
+            Can someone come out? My number is 555-402-8871.
+       expected: status LEAD; phone "555-402-8871"; name "John"
+       got     : status LEAD; phone "555-402-8871"; name "John"
+       also    : email "john.smith@gmail.com"; job_type "Leak"; would ask for: address, urgency
+
+[pass] 5. CASE 2 - customer replying inside our own thread
+       fed in  : an email that reads -
+            From: john.smith@gmail.com
+            Subject: Re: Your Water Heater Repair request
+            
+            Tuesday works, thanks.
+            
+            On Mon, Aug 10, 2026 at 2:14 PM Joe's Plumbing wrote:
+            > Hi John, thanks for reaching out about your Water Heater Repair.
+            > Reply 1 for Tue 2-4pm or 2 for Wed 9-11am.
+            > Name: John Smith
+            > Phone: (555) 402-8871
+       expected: status THREAD_REPLY
+       got     : status THREAD_REPLY
+                 (reason: reply inside an existing conversation)
+
+[pass] 6. CASE 3 - a forwarded enquiry
+       fed in  : an email that reads -
+            From: assistant@joesplumbing.com
+            Subject: Fwd: New Contact Form Submission
+            
+            ---------- Forwarded message ----------
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Dave Wilson
+            Phone: (555) 771-2093
+            Service Needed: Toilet Installation
+       expected: status LEAD; name "Dave Wilson"; email nothing
+       got     : status LEAD; name "Dave Wilson"; email nothing
+       also    : phone "(555) 771-2093"; job_type "Toilet Installation"; would ask for: address, urgency
+
+[pass] 7. CASE 4 - marketplace lead (Thumbtack style)
+       fed in  : an email that reads -
+            From: leads@thumbtack.com
+            Subject: New lead: Plumbing
+            
+            You have a new lead!
+            
+            Customer: John S.
+            Project: Water heater installation
+            Location: Tampa, FL 33601
+            Requested: Within a week
+       expected: status LEAD; name "John S."; job_type "Water heater installation"; address "Tampa, FL 33601"; urgency "Within a week"
+       got     : status LEAD; name "John S."; job_type "Water heater installation"; address "Tampa, FL 33601"; urgency "Within a week"
+       also    : email "leads@thumbtack.com"
+
+[pass] 8. CASE 5 - colons inside the customer's own message
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Sarah Chen
+            Phone: 555-889-4412
+            Message: Here's the situation:
+            Problem: burst pipe under the sink
+            Urgency: whenever you can, honestly
+       expected: status LEAD; name "Sarah Chen"; email nothing
+       got     : status LEAD; name "Sarah Chen"; email nothing
+       also    : *** EMERGENCY - alert the plumber, do not book ***; phone "555-889-4412"; job_type "Burst Pipe"; urgency "whenever you can, honestly"; would ask for: address
+
+[pass] 9. CASE 6 - out-of-office auto-reply (MUST stay silent)
+       fed in  : an email that reads -
+            From: john.smith@gmail.com
+            Subject: Automatic reply: Your Water Heater Repair request
+            
+            I am out of the office until August 20th with limited access to email.
+            For urgent matters call 555-402-8871.
+       expected: status SKIP_AUTO
+       got     : status SKIP_AUTO
+                 (reason: machine-generated message)
+
+[pass] 10. CASE 7 - spam / phishing (MUST stay silent)
+       fed in  : an email that reads -
+            From: winner@prize-notification.biz
+            Subject: URGENT: Your account requires verification
+            
+            Dear Customer,
+            Please confirm your details immediately.
+            Contact: support@prize-notification.biz  Phone: 1-800-555-0199
+       expected: status SKIP_NOT_LEAD
+       got     : status SKIP_NOT_LEAD
+                 (reason: not enough to identify a genuine enquiry)
+
+[pass] 11. CASE 8 - unknown extra fields we've never seen
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Robert Lee
+            Phone: (555) 220-7788
+            How did you hear about us?: Google
+            Are you a returning customer?: No
+            Preferred technician: Mike
+            Service Needed: Water Heater Repair
+       expected: status LEAD; name "Robert Lee"; job_type "Water Heater Repair"; email nothing
+       got     : status LEAD; name "Robert Lee"; job_type "Water Heater Repair"; email nothing
+       also    : phone "(555) 220-7788"; would ask for: address, urgency
+
+[pass] 12. Angi lead - real question wording, name split in two
+       fed in  : an email that reads -
+            From: leads@angi.com
+            Subject: New lead: Plumbing
+            
+            What plumbing do you need help with?: Water Heater
+            What needs to be installed or replaced?: Water heater
+            What kind of location is this?: Home
+            When do you need this work done?: Within a week
+            Please tell us a little about your project: Old unit is 14 years old and noisy.
+            What's your project address?: 812 Maple St, Columbus OH 43004
+            First Name: Michael
+            Last Name: Torres
+            Phone: (614) 555-2201
+            Email: mtorres@example.com
+       expected: status LEAD; name "Michael Torres"; job_type "Water Heater"; urgency "Within a week"; email "mtorres@example.com"; emergency "False"
+       got     : status LEAD; name "Michael Torres"; job_type "Water Heater"; urgency "Within a week"; email "mtorres@example.com"; emergency "False"
+       also    : phone "(614) 555-2201"; address "812 Maple St, Columbus OH 43004"; property_type "Home"
+
+[pass] 13. Thumbtack lead - phone only, flooded = Yes
+       fed in  : an email that reads -
+            From: no-reply@thumbtack.com
+            Subject: New lead: Emergency Plumbing
+            
+            Customer: Dana R.
+            Is any part of the building currently flooded?: Yes
+            Which appliances, if any, are affected?: Water heater, washing machine
+            What type of property do you have?: Single family home
+            When do you need this job to start?: Right away
+            Send a message to the pro: Water everywhere in the basement.
+            Zip: 33612
+            Phone: (813) 555-0147
+       expected: status LEAD; name "Dana R."; email nothing; emergency "True"
+       got     : status LEAD; name "Dana R."; email nothing; emergency "True"
+       also    : *** EMERGENCY - alert the plumber, do not book ***; phone "(813) 555-0147"; job_type "Water Heater"; address "33612"; urgency "Right away"; property_type "Single family home"; appliances "Water heater, washing machine"
+
+[pass] 14. Google Local Services - just a link to their dashboard
+       fed in  : an email that reads -
+            From: noreply@localservicesads.google.com
+            Subject: You have a new lead
+            
+            You have a new message lead.
+            View the details in your lead inbox.
+            https://ads.google.com/localservices/leads
+       expected: status NEEDS_REVIEW
+       got     : status NEEDS_REVIEW
+                 (reason: lead from a marketplace we can't read fully)
+       also    : would ask for: address, urgency
+
+[pass] 15. Squarespace form - first and last name in separate boxes
+       fed in  : an email that reads -
+            From: form-submission@squarespace.info
+            Subject: Form Submission
+            
+            First Name: Angela
+            Last Name: Brooks
+            Email: abrooks@example.com
+            Phone Number: 704-555-8890
+            Message: Shower drips constantly, would like a quote.
+       expected: status LEAD; name "Angela Brooks"; email "abrooks@example.com"
+       got     : status LEAD; name "Angela Brooks"; email "abrooks@example.com"
+       also    : phone "704-555-8890"; job_type "Shower"; would ask for: address, urgency
+
+[pass] 16. Gravity Forms - HTML table, label and value in one row
+       fed in  : an email that reads -
+            <html><body><table>
+            <tr><td>Name</td><td>Priya Nair</td></tr>
+            <tr><td>Phone</td><td>408.555.7712</td></tr>
+            <tr><td>Service Needed</td><td>Garbage Disposal Replacement</td></tr>
+            <tr><td>Message</td><td>Disposal jammed and humming.</td></tr>
+            </table></body></html>
+       expected: status LEAD; name "Priya Nair"; phone "408.555.7712"; job_type "Garbage Disposal Replacement"; email nothing
+       got     : status LEAD; name "Priya Nair"; phone "408.555.7712"; job_type "Garbage Disposal Replacement"; email nothing
+       also    : would ask for: address, urgency
+
+[pass] 17. Emergency written in plain words, no form at all
+       fed in  : an email that reads -
+            From: tom.baker@example.com
+            Subject: URGENT - basement flooding
+            
+            Hi, this is Tom. My basement is flooding right now. Please help.
+            You can reach me on 312-555-9034.
+       expected: status LEAD; name "Tom"; emergency "True"
+       got     : status LEAD; name "Tom"; emergency "True"
+       also    : *** EMERGENCY - alert the plumber, do not book ***; phone "312-555-9034"; email "tom.baker@example.com"; job_type "Flooding"; would ask for: address, urgency
+
+[pass] 18. Routine job - must NOT be flagged as an emergency
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Ellen Park
+            Phone: (503) 555-1188
+            Service Needed: Faucet Installation
+            When do you need this work done?: Sometime next month
+            Message: Would like a quote for replacing two bathroom faucets.
+       expected: status LEAD; name "Ellen Park"; emergency "False"; urgency "Sometime next month"
+       got     : status LEAD; name "Ellen Park"; emergency "False"; urgency "Sometime next month"
+       also    : phone "(503) 555-1188"; job_type "Faucet Installation"; would ask for: address
+
+[pass] 19. Messy form - stray spaces and SHOUTING labels
+       fed in  : an email that reads -
+            From: noreply@site.com
+            Subject: New Contact Form Submission
+            
+               NAME   :   Carla Diaz
+               PHONE NUMBER :   (786) 555-3321
+               SERVICE NEEDED :   Sewer Line Repair
+       expected: status LEAD; name "Carla Diaz"; job_type "Sewer Line Repair"
+       got     : status LEAD; name "Carla Diaz"; job_type "Sewer Line Repair"
+       also    : phone "(786) 555-3321"; would ask for: address, urgency
+
+[pass] 20. Bounce message - mail could not be delivered
+       fed in  : an email that reads -
+            From: MAILER-DAEMON@googlemail.com
+            Subject: Delivery Status Notification (Failure)
+            
+            Your message could not be delivered to jsmith@gmial.com.
+       expected: status SKIP_AUTO
+       got     : status SKIP_AUTO
+                 (reason: machine-generated message)
+
+[pass] 21. Yelp quote request - details locked in their app
+       fed in  : an email that reads -
+            From: leads@yelp.com
+            Subject: New quote request
+            
+            You have a new quote request from a customer.
+            Log in to Yelp for Business to respond.
+       expected: status NEEDS_REVIEW
+       got     : status NEEDS_REVIEW
+                 (reason: lead from a marketplace we can't read fully)
+       also    : email "leads@yelp.com"; would ask for: address, urgency
+
+[pass] 22. Someone else's email inside the message
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Greg Hall
+            Email: ghall@example.com
+            Phone: (206) 555-4412
+            Service Needed: Toilet Repair
+            Message: My landlord is manager@bigrealty.com, copy him in if needed.
+       expected: status LEAD; email "ghall@example.com"; name "Greg Hall"
+       got     : status LEAD; email "ghall@example.com"; name "Greg Hall"
+       also    : phone "(206) 555-4412"; job_type "Toilet Repair"; would ask for: address, urgency
+
+[pass] 23. No labels - 'my name is' in the middle of a sentence
+       fed in  : an email that reads -
+            From: jenny.k@example.com
+            Subject: quote
+            
+            my name is Jenny Kowalski and I need a new sump pump installed.
+            Call 617-555-2245.
+       expected: status LEAD; name "Jenny Kowalski"; job_type "Sump Pump"
+       got     : status LEAD; name "Jenny Kowalski"; job_type "Sump Pump"
+       also    : phone "617-555-2245"; email "jenny.k@example.com"; would ask for: address, urgency
+
+[pass] 24. HTML form using &amp; instead of a plain ampersand
+       fed in  : an email that reads -
+            <html><body><table>
+            <tr><td><strong>Your Name</strong></td></tr><tr><td>Luis Ortega</td></tr>
+            <tr><td><strong>Best Number</strong></td></tr><tr><td>305-555-6620</td></tr>
+            <tr><td><strong>Service Type</strong></td></tr><tr><td>Drain &amp; Sewer Cleaning</td></tr>
+            </table></body></html>
+       expected: status LEAD; name "Luis Ortega"; job_type "Drain & Sewer Cleaning"
+       got     : status LEAD; name "Luis Ortega"; job_type "Drain & Sewer Cleaning"
+       also    : phone "305-555-6620"; would ask for: address, urgency
+
+[pass] 25. A work signature holding the office switchboard
+       fed in  : an email that reads -
+            From: barbara@example.com
+            Subject: leaking radiator
+            
+            Hi, this is Barbara. The radiator in our back office has been leaking
+            since Monday and there's a bucket under it now. Best number for me is
+            216-555-0644, I'm usually in after 10.
+            
+            Thanks,
+            
+            Barbara Nolan
+            Office Manager | Nolan & Sons Ltd
+            Tel: 216-555-9000  |  Fax: 216-555-9001
+            barbara.nolan@nolanandsons.example.com
+            www.nolanandsons.example.com
+       expected: status LEAD; name "Barbara"; phone "216-555-0644"
+       got     : status LEAD; name "Barbara"; phone "216-555-0644"
+       also    : email "barbara.nolan@nolanandsons.example.com"; job_type "Heating"; would ask for: address, urgency
+
+[pass] 26. The only phone number is in the signature
+       fed in  : an email that reads -
+            From: john@example.com
+            Subject: blocked drain
+            
+            Hi, my kitchen drain is blocked and water is backing up.
+            
+            Thanks,
+            John Petrie
+            216-555-0400
+       expected: status LEAD; phone "216-555-0400"
+       got     : status LEAD; phone "216-555-0400"
+       also    : email "john@example.com"; job_type "Drain Cleaning"; would ask for: address, urgency
+
+[pass] 27. Writing for his wife, and giving her number not his
+       fed in  : an email that reads -
+            From: greg@example.com
+            Subject: leak under sink
+            
+            Hi, this is Greg. There is a leak under the kitchen sink.
+            You can reach my wife on 216-555-0200 during the day.
+       expected: status LEAD; name "Greg"; phone "216-555-0200"; phone_belongs_to "their wife"
+       got     : status LEAD; name "Greg"; phone "216-555-0200"; phone_belongs_to "their wife"
+       also    : email "greg@example.com"; job_type "Leak"; would ask for: address, urgency
+
+[pass] 30. Her own number, and her landlord's for when she can't answer
+       fed in  : an email that reads -
+            From: rita@example.com
+            Subject: toilet leaking
+            
+            Hi, this is Rita Shaw. The upstairs toilet is leaking onto the floor.
+            My number is 216-555-0455. If you are coming and I don't pick up then
+            call my landlord on 216-555-0900.
+       expected: status LEAD; name "Rita Shaw"; phone "216-555-0455"; other_phone "216-555-0900"; other_phone_note "their landlord"
+       got     : status LEAD; name "Rita Shaw"; phone "216-555-0455"; other_phone "216-555-0900"; other_phone_note "their landlord"
+       also    : email "rita@example.com"; job_type "Toilet"; would ask for: address, urgency
+
+[pass] 31. The second number is mentioned long before its owner
+       fed in  : an email that reads -
+            From: nina@example.com
+            Subject: boiler not firing
+            
+            Hi, I'm Nina Patel. The boiler will not fire up at all.
+            Call me on 216-555-0311 if you come by 2, or else my landlord will open
+            the door to you, he is on 216-555-0912.
+       expected: status LEAD; name "Nina Patel"; phone "216-555-0311"; other_phone "216-555-0912"; other_phone_note "their landlord"
+       got     : status LEAD; name "Nina Patel"; phone "216-555-0311"; other_phone "216-555-0912"; other_phone_note "their landlord"
+       also    : email "nina@example.com"; job_type "Boiler"; would ask for: address, urgency
+
+[pass] 32. A signature switchboard is never offered as a second contact
+       fed in  : an email that reads -
+            From: barbara@example.com
+            Subject: leaking radiator
+            
+            Hi, this is Barbara. The radiator has been leaking since Monday. Best
+            number for me is 216-555-0644.
+            
+            Thanks,
+            
+            Barbara Nolan
+            Office Manager | Nolan & Sons Ltd
+            Tel: 216-555-9000  |  Fax: 216-555-9001
+       expected: status LEAD; name "Barbara"; phone "216-555-0644"; other_phone nothing
+       got     : status LEAD; name "Barbara"; phone "216-555-0644"; other_phone nothing
+       also    : email "barbara@example.com"; job_type "Heating"; would ask for: address, urgency
+
+[pass] 33. A form where the labels and values were made bold
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Website Inquiry
+            
+            *Name:* *Marcus Webb*
+            *Phone:* *(216) 555-0700*
+            *Email:* m.webb@example.com
+            *Service Needed:* *Drain Cleaning*
+            *Message:* Kitchen sink is *completely* blocked.
+       expected: status LEAD; name "Marcus Webb"; phone "(216) 555-0700"; email "m.webb@example.com"; job_type "Drain Cleaning"
+       got     : status LEAD; name "Marcus Webb"; phone "(216) 555-0700"; email "m.webb@example.com"; job_type "Drain Cleaning"
+       also    : would ask for: address, urgency
+
+[pass] 34. Somebody typing loosely, with their name in bold
+       fed in  : an email that reads -
+            From: marcus@example.com
+            Subject: blocked sink
+            
+            Hi, I'm *Marcus*. The kitchen sink is completely blocked.
+            My number is 216-555-0700.
+       expected: status LEAD; name "Marcus"; phone "216-555-0700"
+       got     : status LEAD; name "Marcus"; phone "216-555-0700"
+       also    : email "marcus@example.com"; job_type "Drain Cleaning"; would ask for: address, urgency
+
+[pass] 35. Underscores in an email address are left alone
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Jose Ramirez
+            Phone: (216) 555-0512
+            Email: jose_ramirez@example.com
+            Service Needed: Garbage Disposal Repair
+       expected: status LEAD; name "Jose Ramirez"; email "jose_ramirez@example.com"
+       got     : status LEAD; name "Jose Ramirez"; email "jose_ramirez@example.com"
+       also    : phone "(216) 555-0512"; job_type "Garbage Disposal Repair"; would ask for: address, urgency
+
+[pass] 36. A long subject folded across lines must not reach the message
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission from the website contact page
+             regarding an urgent plumbing matter concerning the downstairs
+             bathroom and kitchen area
+            
+            Name: Priya Raman
+            Phone: (614) 555-7788
+            Email: p.raman@example.com
+            Service Needed: Drain Cleaning
+       expected: status LEAD; name "Priya Raman"; job_type "Drain Cleaning"; emergency "False"
+       got     : status LEAD; name "Priya Raman"; job_type "Drain Cleaning"; emergency "False"
+       also    : phone "(614) 555-7788"; email "p.raman@example.com"; would ask for: address, urgency
+
+[pass] 37. A customer saying it is NOT urgent
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Gerald Pike
+            Phone: (216) 555-0800
+            Email: g.pike@example.com
+            Service Needed: Faucet Replacement
+            Message: Not urgent at all, just whenever you have a free slot next month.
+       expected: status LEAD; name "Gerald Pike"; emergency "False"
+       got     : status LEAD; name "Gerald Pike"; emergency "False"
+       also    : phone "(216) 555-0800"; email "g.pike@example.com"; job_type "Faucet Replacement"; would ask for: address, urgency
+
+[pass] 38. A customer who really does mean urgent
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Helen Ward
+            Phone: (330) 555-0119
+            Email: helen.ward@example.com
+            Service Needed: Leak Repair
+            Message: This is urgent, water is coming through the ceiling.
+       expected: status LEAD; name "Helen Ward"; emergency "True"
+       got     : status LEAD; name "Helen Ward"; emergency "True"
+       also    : *** EMERGENCY - alert the plumber, do not book ***; phone "(330) 555-0119"; email "helen.ward@example.com"; job_type "Leak Repair"; would ask for: address, urgency
+
+[pass] 39. A flooding basement is still an emergency, no matter the wording
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Angela Foster
+            Phone: (216) 555-0143
+            Email: angela.foster@example.com
+            Service Needed: Burst Pipe
+            Message: The basement is flooding, water everywhere, please hurry.
+       expected: status LEAD; name "Angela Foster"; emergency "True"
+       got     : status LEAD; name "Angela Foster"; emergency "True"
+       also    : *** EMERGENCY - alert the plumber, do not book ***; phone "(216) 555-0143"; email "angela.foster@example.com"; job_type "Burst Pipe"; would ask for: address, urgency
+
+[pass] 40. A dripping tap, described in ordinary words
+       fed in  : an email that reads -
+            From: louise@example.com
+            Subject: dripping tap
+            
+            Hi, this is Louise. The bathroom tap has been dripping for a week.
+            My number is 216-555-0455.
+       expected: status LEAD; name "Louise"; phone "216-555-0455"; job_type "Faucet"
+       got     : status LEAD; name "Louise"; phone "216-555-0455"; job_type "Faucet"
+       also    : email "louise@example.com"; would ask for: address, urgency
+
+[pass] 41. A word that merely CONTAINS a job word is not a job
+       fed in  : an email that reads -
+            From: newsletter@officesupplies.example.com
+            Subject: August offers
+            
+            Hi there,
+            Our summer sale on packing tape and adaptors is now on. Message us
+            about bulk pricing.
+       expected: status SKIP_NOT_LEAD
+       got     : status SKIP_NOT_LEAD
+                 (reason: not enough to identify a genuine enquiry)
+
+[pass] 42. A blocked drain described as clogged
+       fed in  : an email that reads -
+            From: dan@example.com
+            Subject: kitchen problem
+            
+            Hi, I'm Dan Reeve. The kitchen sink is completely clogged and won't
+            drain at all. Reach me on 216-555-0611.
+       expected: status LEAD; name "Dan Reeve"; job_type "Drain Cleaning"
+       got     : status LEAD; name "Dan Reeve"; job_type "Drain Cleaning"
+       also    : phone "216-555-0611"; email "dan@example.com"; would ask for: address, urgency
+
+[pass] 43. Low water pressure, which the word list never had
+       fed in  : an email that reads -
+            From: mei@example.com
+            Subject: shower problem
+            
+            Hi, my name is Mei Chen. There is almost no pressure in the upstairs
+            shower any more. My number is 216-555-0388.
+       expected: status LEAD; name "Mei Chen"; job_type "Water Pressure"
+       got     : status LEAD; name "Mei Chen"; job_type "Water Pressure"
+       also    : phone "216-555-0388"; email "mei@example.com"; would ask for: address, urgency
+
+[pass] 44. A customer who decorated her name with an emoji
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New message from your website
+            
+            Name: Chloe Barnett 😎
+            Phone: (216) 555-0322
+            Email: chloe.b@example.com
+            Service Needed: Leak Repair
+            Message: Ceiling is dripping please help 😭😭
+       expected: status LEAD; name "Chloe Barnett"; email "chloe.b@example.com"
+       got     : status LEAD; name "Chloe Barnett"; email "chloe.b@example.com"
+       also    : phone "(216) 555-0322"; job_type "Leak Repair"; would ask for: address, urgency
+
+[pass] 45. Emoji in the MESSAGE are stripped too - nothing the plumber reads has smiley faces in it
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Chloe Barnett
+            Phone: (216) 555-0322
+            Email: chloe.b@example.com
+            Service Needed: Leak Repair
+            Message: Ceiling is dripping please help 😭
+       expected: status LEAD; message "Ceiling is dripping please help"
+       got     : status LEAD; message "Ceiling is dripping please help"
+       also    : name "Chloe Barnett"; phone "(216) 555-0322"; email "chloe.b@example.com"; job_type "Leak Repair"; would ask for: address, urgency
+
+[pass] 47. Accents, dashes and ordinary punctuation survive the emoji strip
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Jose Ramirez
+            Phone: (216) 555-0512
+            Email: jose.ramirez@example.com
+            Service Needed: Garbage Disposal Repair
+            Message: Disposal hums, but doesn't turn - it's been like that since
+            Monday. Cost?
+       expected: status LEAD; name "Jose Ramirez"; message "Disposal hums, but doesn't turn - it's been like that since
+Monday. Cost?"
+       got     : status LEAD; name "Jose Ramirez"; message "Disposal hums, but doesn't turn - it's been like that since
+Monday. Cost?"
+       also    : phone "(216) 555-0512"; email "jose.ramirez@example.com"; job_type "Garbage Disposal Repair"; would ask for: address, urgency
+
+[pass] 48. A bold email address must not keep its asterisks
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Website Inquiry
+            
+            Name: Marcus Webb
+            Phone: (216) 555-0700
+            Email: *m.webb@example.com *
+            Service Needed: Drain Cleaning
+       expected: status LEAD; name "Marcus Webb"; email "m.webb@example.com"
+       got     : status LEAD; name "Marcus Webb"; email "m.webb@example.com"
+       also    : phone "(216) 555-0700"; job_type "Drain Cleaning"; would ask for: address, urgency
+
+[pass] 49. An email address with an underscore is still left alone
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Ana Silva
+            Phone: (216) 555-0733
+            Email: ana_silva.99@example.co.uk
+            Service Needed: Leak Repair
+       expected: status LEAD; name "Ana Silva"; email "ana_silva.99@example.co.uk"
+       got     : status LEAD; name "Ana Silva"; email "ana_silva.99@example.co.uk"
+       also    : phone "(216) 555-0733"; job_type "Leak Repair"; would ask for: address, urgency
+
+[pass] 50. A form QUESTION containing an emergency word, answered No
+       fed in  : an email that reads -
+            From: leads@thumbtack.com
+            Subject: New lead: Plumbing
+            
+            Customer: Denise W.
+            Is any part of the building currently flooded?: No
+            Which appliances, if any, are affected?: Kitchen faucet
+            What type of property do you have?: Condo
+            When do you need this job to start?: Within a few days
+            Send a message to the pro: Bathroom faucet dripping constantly.
+            Zip: 44113
+            Phone: (216) 555-0355
+       expected: status LEAD; name "Denise W."; emergency "False"; job_type "Faucet"
+       got     : status LEAD; name "Denise W."; emergency "False"; job_type "Faucet"
+       also    : phone "(216) 555-0355"; email "leads@thumbtack.com"; address "44113"; urgency "Within a few days"; property_type "Condo"; appliances "Kitchen faucet"
+
+[pass] 51. The same form question, answered YES, is still an emergency
+       fed in  : an email that reads -
+            From: leads@thumbtack.com
+            Subject: New lead: Plumbing
+            
+            Customer: Denise W.
+            Is any part of the building currently flooded?: Yes
+            Which appliances, if any, are affected?: Kitchen faucet
+            When do you need this job to start?: Right away
+            Send a message to the pro: Water is coming up through the floor.
+            Zip: 44113
+            Phone: (216) 555-0355
+       expected: status LEAD; name "Denise W."; emergency "True"
+       got     : status LEAD; name "Denise W."; emergency "True"
+       also    : *** EMERGENCY - alert the plumber, do not book ***; phone "(216) 555-0355"; email "leads@thumbtack.com"; job_type "Faucet"; address "44113"; urgency "Right away"; appliances "Kitchen faucet"
+
+[pass] 52. An emergency the customer describes in their own answer
+       fed in  : an email that reads -
+            From: leads@thumbtack.com
+            Subject: New lead: Plumbing
+            
+            Customer: Marcus T.
+            Is any part of the building currently flooded?: No
+            Send a message to the pro: A pipe has burst under the kitchen sink and
+            water is gushing out.
+            Zip: 44113
+            Phone: (216) 555-0361
+       expected: status LEAD; name "Marcus T."; emergency "True"
+       got     : status LEAD; name "Marcus T."; emergency "True"
+       also    : *** EMERGENCY - alert the plumber, do not book ***; phone "(216) 555-0361"; email "leads@thumbtack.com"; job_type "Burst Pipe"; address "44113"; would ask for: urgency
+
+[pass] 53. A form filled in entirely with caps lock on
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: NEW CONTACT FORM SUBMISSION
+            
+            NAME: WALTER KIM
+            PHONE: (216) 555-0955
+            EMAIL: W.KIM@EXAMPLE.COM
+            SERVICE NEEDED: SEWER LINE INSPECTION
+       expected: status LEAD; name "Walter Kim"; job_type "Sewer Line Inspection"; email "W.KIM@EXAMPLE.COM"
+       got     : status LEAD; name "Walter Kim"; job_type "Sewer Line Inspection"; email "W.KIM@EXAMPLE.COM"
+       also    : phone "(216) 555-0955"; would ask for: address, urgency
+
+[pass] 54. An acronym is still allowed to shout
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: NEW CONTACT FORM SUBMISSION
+            
+            NAME: DIANE WALSH
+            PHONE: (216) 555-0388
+            EMAIL: d.walsh@example.com
+            SERVICE NEEDED: HVAC MAINTENANCE
+       expected: status LEAD; name "Diane Walsh"; job_type "HVAC Maintenance"
+       got     : status LEAD; name "Diane Walsh"; job_type "HVAC Maintenance"
+       also    : phone "(216) 555-0388"; email "d.walsh@example.com"; would ask for: address, urgency
+
+[pass] 55. A name that already has small letters is left alone
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Mary-Anne O'Brien
+            Phone: (216) 555-0755
+            Email: ma.obrien@example.com
+            Service Needed: Toilet Installation
+       expected: status LEAD; name "Mary-Anne O'Brien"; job_type "Toilet Installation"
+       got     : status LEAD; name "Mary-Anne O'Brien"; job_type "Toilet Installation"
+       also    : phone "(216) 555-0755"; email "ma.obrien@example.com"; would ask for: address, urgency
+
+[pass] 56. The note about a second number stays inside its own field
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Ian Prescott
+            Phone: (216) 555-0733
+            Email: ian.prescott@example.com
+            Service Needed: Leak Detection
+            Message: Call my mobile 216-555-0801 if the house phone doesn't answer.
+       expected: status LEAD; name "Ian Prescott"; phone "(216) 555-0733"; other_phone "216-555-0801"; other_phone_said "Call my mobile 216-555-0801 if the house phone doesn't answer."
+       got     : status LEAD; name "Ian Prescott"; phone "(216) 555-0733"; other_phone "216-555-0801"; other_phone_said "Call my mobile 216-555-0801 if the house phone doesn't answer."
+       also    : email "ian.prescott@example.com"; job_type "Leak Detection"; would ask for: address, urgency
+
+[pass] 57. A wrapped sentence in free text is still kept whole
+       fed in  : an email that reads -
+            From: rita@example.com
+            Subject: toilet leaking
+            
+            Hi, this is Rita Shaw. The upstairs toilet is leaking onto the floor.
+            My number is 216-555-0455. If you are coming and I don't pick up then
+            call my landlord on 216-555-0900.
+       expected: status LEAD; name "Rita Shaw"; phone "216-555-0455"; other_phone "216-555-0900"; other_phone_note "their landlord"; other_phone_said "If you are coming and I don't pick up then call my landlord on 216-555-0900."
+       got     : status LEAD; name "Rita Shaw"; phone "216-555-0455"; other_phone "216-555-0900"; other_phone_note "their landlord"; other_phone_said "If you are coming and I don't pick up then call my landlord on 216-555-0900."
+       also    : email "rita@example.com"; job_type "Toilet"; would ask for: address, urgency
+
+[pass] 46. Real names keep their apostrophes, hyphens and accents
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Mary-Anne O'Brien
+            Phone: (216) 555-0755
+            Email: ma.obrien@example.com
+            Service Needed: Toilet Installation
+       expected: status LEAD; name "Mary-Anne O'Brien"
+       got     : status LEAD; name "Mary-Anne O'Brien"
+       also    : phone "(216) 555-0755"; email "ma.obrien@example.com"; job_type "Toilet Installation"; would ask for: address, urgency
+
+[pass] 28. His own number AND his landlord's
+       fed in  : an email that reads -
+            From: owen@example.com
+            Subject: water heater
+            
+            Hi, I'm Owen Fletcher. The water heater has stopped working.
+            My number is 216-555-0777. I rent - my landlord's number is
+            216-555-0900 if you need access.
+       expected: status LEAD; name "Owen Fletcher"; phone "216-555-0777"
+       got     : status LEAD; name "Owen Fletcher"; phone "216-555-0777"
+       also    : email "owen@example.com"; job_type "Water Heater"; would ask for: address, urgency
+
+[pass] 29. A phone field with the fax number on the same line
+       fed in  : an email that reads -
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+            
+            Name: Helen Ward
+            Tel: 330-555-0119  |  Fax: 330-555-0120
+            Service Needed: Faucet Replacement
+       expected: status LEAD; name "Helen Ward"; phone "330-555-0119"
+       got     : status LEAD; name "Helen Ward"; phone "330-555-0119"
+       also    : job_type "Faucet Replacement"; would ask for: address, urgency
+
+======================================================================
+  57 passed, 0 failed, 57 total
+======================================================================
+
+======================================================================
+  PART 2 - THE REPLY ENGINE
+  Checks the times it offers, who it decides to contact, and
+  the exact words it writes.
+======================================================================
+
+[pass] Tuesday 10am offers late morning, then skips over lunch
+       fed in  : Joe: Mon-Fri 8am-5pm, lunch 12-1, 1h windows, 1h notice, max 3/day, 2 options. Pretend it is Tuesday 11 Aug, 10:00am. One hour's notice takes us to 11am. The next slot would be 12-1, which is his lunch, so it resumes at 1
+       expected: ['today 11am-12pm', 'today 1-2pm']
+       got     : ['today 11am-12pm', 'today 1-2pm']
+
+[pass] Friday 4pm skips the weekend and offers Monday
+       fed in  : Joe: Mon-Fri 8am-5pm, lunch 12-1, 1h windows, 1h notice, max 3/day, 2 options. Pretend it is Friday 14 Aug, 4:00pm
+       expected: ['Monday 8-9am', 'Monday 9-10am']
+       got     : ['Monday 8-9am', 'Monday 9-10am']
+
+[pass] Saturday morning knows he doesn't work weekends
+       fed in  : Joe: Mon-Fri 8am-5pm, lunch 12-1, 1h windows, 1h notice, max 3/day, 2 options. Pretend it is Saturday 15 Aug, 9:00am
+       expected: ['Monday 8-9am', 'Monday 9-10am']
+       got     : ['Monday 8-9am', 'Monday 9-10am']
+
+[pass] 11pm doesn't offer the middle of the night
+       fed in  : Joe: Mon-Fri 8am-5pm, lunch 12-1, 1h windows, 1h notice, max 3/day, 2 options. Pretend it is Tuesday 11 Aug, 11:00pm
+       expected: ['tomorrow 8-9am', 'tomorrow 9-10am']
+       got     : ['tomorrow 8-9am', 'tomorrow 9-10am']
+
+[pass] an email before he opens waits for his opening time
+       fed in  : Joe: Mon-Fri 8am-5pm, lunch 12-1, 1h windows, 1h notice, max 3/day, 2 options. Pretend it is Tuesday 11 Aug, 6:00am (before he opens). One hour's notice lands at 7am, which is still before he starts, so it waits for 8. Until 18 Aug this test expected "today 12-2pm" as an option - a window running straight through the lunch hour, passing as correct because Joe had no lunch break set at all
+       expected: ['today 8-9am', 'today 9-10am']
+       got     : ['today 8-9am', 'today 9-10am']
+
+[pass] Friday 2pm now keeps him working the same afternoon
+       fed in  : Joe: Mon-Fri 8am-5pm, lunch 12-1, 1h windows, 1h notice, max 3/day, 2 options. Pretend it is Friday 14 Aug, 2:00pm. Under the old 4-hour notice this landed at 6pm - after he finished - so the customer was pushed to MONDAY and Joe lost the whole Friday afternoon. That wasted capacity is exactly why the notice came down to 1 hour
+       expected: ['today 3-4pm', 'today 4-5pm']
+       got     : ['today 3-4pm', 'today 4-5pm']
+
+[pass] never offers before his day starts or after it ends
+       fed in  : Asked for 12 windows in a row from Tuesday 6am. Got: today 8-9am, today 9-10am, today 10-11am, tomorrow 8-9am, tomorrow 9-10am, tomorrow 10-11am, Thursday 8-9am, Thursday 9-10am, Thursday 10-11am, Friday 8-9am, Friday 9-10am, Friday 10-11am
+       expected: yes
+       got     : yes
+
+[pass] never offers a Saturday or Sunday
+       fed in  : The same 12 windows, checking the day of the week on each
+       expected: yes
+       got     : yes
+
+[pass] never offers sooner than his 1 hour notice
+       fed in  : The same 12 windows, from Tuesday 6am. Nothing may be offered before 7am - and since he doesn't open until 8, the real earliest is 8am
+       expected: yes
+       got     : yes
+
+[pass] respects the 3-per-day cap
+       fed in  : The same 12 windows, counted per day: {'2026-08-11': 3, '2026-08-12': 3, '2026-08-13': 3, '2026-08-14': 3}
+       expected: 3
+       got     : 3
+
+[pass] every window is exactly 1 hour long
+       fed in  : The same 12 windows, measuring start to finish on each. Changed from 2 hours on 18 Aug: a window promises when Joe TURNS UP, not when he finishes, so a wider one means more of his day held back waiting
+       expected: {1}
+       got     : {1}
+
+[pass] no window ever runs through Joe's lunch
+       fed in  : Six windows from Tuesday 10am: today 11am-12pm, today 1-2pm, today 2-3pm, tomorrow 8-9am, tomorrow 9-10am, tomorrow 10-11am. His lunch is 12-1. A window may END at 12:00 and may START at 1:00, but none may sit inside the hour or straddle it
+       expected: []
+       got     : []
+
+[pass] a window may finish exactly at the start of lunch
+       fed in  : The same six windows: today 11am-12pm, today 1-2pm, today 2-3pm, tomorrow 8-9am, tomorrow 9-10am, tomorrow 10-11am. 11am-12pm is fine - he stops and eats. Blocking that too would cost him an hour a day for no reason
+       expected: yes
+       got     : yes
+
+[pass] the window after lunch starts at 1pm, not 12
+       fed in  : The same six windows: today 11am-12pm, today 1-2pm, today 2-3pm, tomorrow 8-9am, tomorrow 9-10am, tomorrow 10-11am. He picks back up at 1pm once he has eaten
+       expected: yes
+       got     : yes
+
+[pass] Maria DOES work Saturdays, so she gets offered Saturday
+       fed in  : Maria: Mon-SAT 7am-7pm, 3h windows, 2h notice, max 2/day, 3 options, lunch 12-1. Pretend it is Saturday 15 Aug, 9:00am - the exact same moment where Joe was pushed to Monday. 9am + 2h notice = 11am, but an 11am-2pm window would run through her lunch, so it starts at 1pm
+       expected: today 1-4pm
+       got     : today 1-4pm
+
+[pass] Maria is offered 3 options, not Joe's 2
+       fed in  : Her settings say options_to_offer = 3. She got: ['today 1-4pm', 'today 4-7pm', 'Monday 7-10am']
+       expected: 3
+       got     : 3
+
+[pass] Maria's windows are 3 hours long, not 2
+       fed in  : Her settings say window_hours = 3
+       expected: {3}
+       got     : {3}
+
+[pass] Maria can come the same day; Joe cannot
+       fed in  : Same instant, Saturday 15 Aug 9am. Maria: today 1-4pm. Joe: Monday 8-9am
+       expected: yes
+       got     : yes
+
+[pass] Maria's cap is 2 a day, not Joe's 3
+       fed in  : Asked for 8 windows. Counted per day: {'2026-08-15': 2, '2026-08-17': 2, '2026-08-18': 2, '2026-08-19': 2}
+       expected: 2
+       got     : 2
+
+[pass] normal lead with an email address gets emailed
+       fed in  : A lead with name Ann and email a@b.com, not an emergency
+       expected: EMAIL_CUSTOMER
+       got     : EMAIL_CUSTOMER
+
+[pass] lead with only a phone number means the plumber must call
+       fed in  : A lead with a phone number but NO email address
+       expected: ALERT_OWNER_CALL
+       got     : ALERT_OWNER_CALL
+
+[pass] emergency with an email gets both a reply AND an alert
+       fed in  : A lead marked emergency, with an email address
+       expected: EMAIL_AND_ALERT
+       got     : EMAIL_AND_ALERT
+
+[pass] emergency with no email means call them, now
+       fed in  : A lead marked emergency, phone only, no email address
+       expected: ALERT_OWNER_CALL
+       got     : ALERT_OWNER_CALL
+
+[pass] junk mail produces nothing at all
+       fed in  : An email the parser decided was junk
+       expected: NOTHING
+       got     : NOTHING
+
+[pass] an auto-reply produces nothing at all
+       fed in  : An out-of-office or bounce message
+       expected: NOTHING
+       got     : NOTHING
+
+[pass] a customer replying to us is not treated as a new lead
+       fed in  : A customer replying inside a conversation we already started
+       expected: NOTHING
+       got     : NOTHING
+
+[pass] 'leak' reads fine on its own - no 'issue' added
+       fed in  : A lead whose job type is 'Leak'
+       expected: Re: your leak
+       got     : Re: your leak
+
+[pass] greets him by first name only
+       fed in  : The same lead. Opening line of the email was: "Hi John,"
+       expected: yes
+       got     : yes
+
+[pass] 'shower' alone sounds clipped, so becomes 'shower issue'
+       fed in  : A lead whose job type is just 'Shower' - a bare appliance name
+       expected: Re: your shower issue
+       got     : Re: your shower issue
+
+[pass] a job that already describes work is left alone
+       fed in  : A lead whose job type is 'Water Heater Repair' - already a piece of work, so 'issue' must NOT be added
+       expected: Re: your water heater repair
+       got     : Re: your water heater repair
+
+[pass] 'no hot water' is said the way a plumber would say it
+       fed in  : A lead whose job type is 'No Hot Water' - a description of what is NOT working, not the name of a thing. Said back literally it becomes 'your no hot water issue', which is grammatical and obviously machine-written
+       expected: Re: your water heater issue
+       got     : Re: your water heater issue
+
+[pass] 'no water' is said the way a plumber would say it
+       fed in  : A lead whose job type is 'No Water' - same problem, would have read as 'your no water issue'
+       expected: Re: your water supply issue
+       got     : Re: your water supply issue
+
+[pass] the plumber's log still gets the symptom, not the tidied name
+       fed in  : Only the words the CUSTOMER reads are changed. leads.csv still records 'No Hot Water', because knowing the symptom before setting off is worth more to the plumber than a tidy job name
+       expected: yes
+       got     : yes
+
+[pass] unknown job never produces 'your your'
+       fed in  : A lead with NO job type at all - this is what produced the old bug 'Re: your your plumbing job request'
+       expected: Re: your plumbing job
+       got     : Re: your plumbing job
+
+[pass] emergency email says it's urgent
+       fed in  : The same emergency lead. Email body was:
+            Hi Tom,
+            
+            Thanks for reaching out about your plumbing job - that sounds urgent, so I've flagged it straight away.
+            
+            Someone from Joe's Plumbing will call you shortly to get to you as fast as possible.
+            
+            - Joe's Plumbing
+       expected: yes
+       got     : yes
+
+[pass] emergency email does NOT offer appointment times
+       fed in  : The same emergency email - a flooding customer must never be asked to pick between Tuesday and Wednesday
+       expected: yes
+       got     : yes
+
+[pass] asks for the full street address when the form didn't give one
+       fed in  : A lead where the form captured no address. Joe's settings say to ask "What's your full street address?"
+         Email body was:
+            Hi Ann,
+            
+            Thanks for reaching out about your leak.
+            
+            What's your full street address?
+            
+            We check it's inside the area we cover, and it lets us give you an arrival time we can actually keep.
+            
+            - Joe's Plumbing
+       expected: yes
+       got     : yes
+
+[pass] offers NO appointment times until it knows the address
+       fed in  : The same lead. Promising a time before knowing where they live is how you promise a slot you can't keep - or can't drive to
+       expected: yes
+       got     : yes
+
+[pass] no times are even worked out when the address is missing
+       fed in  : The same lead, checking the agent doesn't quietly compute windows it then hides. Nothing should be worked out at all
+       expected: yes
+       got     : yes
+
+[pass] tells the customer WHY it wants the address
+       fed in  : The same lead. "What's your address" from a machine reads like data collection; giving the reason reads like someone helping
+       expected: yes
+       got     : yes
+
+[pass] never asks for the zip code any more
+       fed in  : The same lead. The zip-only question was reversed on 18 August and must not come back
+       expected: yes
+       got     : yes
+
+[pass] asks NOTHING when the form already told us everything
+       fed in  : A lead where the form gave both address and urgency - asking again would insult the customer
+       expected: yes
+       got     : yes
+
+[pass] still offers times normally once it has the address
+       fed in  : The same complete lead. The address rule must not stop ordinary leads getting appointment times
+       expected: yes
+       got     : yes
+
+[pass] never asks two questions at once
+       fed in  : A lead missing BOTH address and urgency. Only one question allowed
+       expected: yes
+       got     : yes
+
+[pass] asks for the address first when both are missing
+       fed in  : The same lead. The address is the one that blocks everything else, so it wins
+       expected: yes
+       got     : yes
+
+[pass] signs off with the right business name
+       fed in  : The same lead, but run through Maria's settings instead of Joe's. Sign-off line was: "- Maria's Heating & Air"
+       expected: yes
+       got     : yes
+
+[pass] emergency alert tells the plumber WHY he's being interrupted
+       fed in  : Tom, flooding basement, phone only. The plumber's alert said:
+              Name     : Tom
+              Phone    : 312-555-9034
+              Job      : Flooding
+              Said     : "My basement is flooding right now."
+       expected: yes
+       got     : yes
+
+[pass] emergency alert is clearly marked as an emergency
+       fed in  : The same alert. Its headline was: "EMERGENCY - CALL NOW"
+       expected: yes
+       got     : yes
+
+[pass] laptop in India, client in Ohio - uses OHIO's clock
+       fed in  : It is 6:30pm Tuesday in India, which is 9:00am Tuesday in Ohio. Joe: Mon-Fri 8am-5pm, lunch 12-1, 1h windows, 1h notice, max 3/day, 2 options
+       expected: ['today 10-11am', 'today 11am-12pm']
+       got     : ['today 10-11am', 'today 11am-12pm']
+
+[pass] does NOT push a same-day job to tomorrow
+       fed in  : This is exactly what the bug did: our 6:30pm looked like the end of the working day, so a customer who emailed at 9am their time was told 'tomorrow'
+       expected: yes
+       got     : yes
+
+[pass] same moment, a Texas client gets Texas times
+       fed in  : The SAME instant (6:30pm in India) but Maria is in Texas, where it is 8:00am. Maria: Mon-SAT 7am-7pm, 3h windows, 2h notice, max 2/day, 3 options, lunch 12-1
+       expected: ['today 1-4pm', 'today 4-7pm', 'tomorrow 7-10am']
+       got     : ['today 1-4pm', 'today 4-7pm', 'tomorrow 7-10am']
+
+[pass] Joe is on New York time
+       fed in  : Read from the timezone line in clients/joes_plumbing.ini
+       expected: America/New_York
+       got     : America/New_York
+
+[pass] Maria is on Chicago time
+       fed in  : Read from the timezone line in clients/marias_hvac.ini
+       expected: America/Chicago
+       got     : America/Chicago
+
+[pass] asking 'what time is it now' returns the CLIENT's local time
+       fed in  : Called now_for_client() with Joe's settings. It returned Wednesday 02 Sep, 07:57AM EDT, while this laptop says Wednesday 02 Sep, 05:27PM
+       expected: yes
+       got     : yes
+
+[pass] two clients in different zones get different local times
+       fed in  : At this instant it is 07:57AM for Joe in Ohio and 06:57AM for Maria in Texas
+       expected: yes
+       got     : yes
+
+[pass] works out Thanksgiving 2026 without being told the date
+       fed in  : Thanksgiving is the 4th Thursday of November. Nothing is typed in - the agent counts the Thursdays itself, so this still works in 2030
+       expected: 2026-11-26
+       got     : 2026-11-26
+
+[pass] July 4th 2026 falls on a Saturday, so it's taken on the Friday
+       fed in  : 4 July 2026 is a Saturday. American businesses take the Friday before
+       expected: 2026-07-03
+       got     : 2026-07-03
+
+[pass] Memorial Day is the LAST Monday in May, not the first
+       fed in  : Counting backwards from the end of May 2026
+       expected: 2026-05-25
+       got     : 2026-05-25
+
+[pass] does not offer Thanksgiving Day
+       fed in  : Pretend it is Wednesday 25 Nov 2026, 4:00pm. The next working morning would be Thursday 26th - Thanksgiving. Joe observes it, so it must skip to Friday
+       expected: ['Friday 8-9am', 'Friday 9-10am']
+       got     : ['Friday 8-9am', 'Friday 9-10am']
+
+[pass] skips an observed holiday AND the weekend behind it
+       fed in  : Pretend it is Thursday 2 July 2026, 4:00pm. Friday 3rd is Independence Day (moved from the Saturday), then Sat and Sun. Next is Monday 6th
+       expected: ['Monday 8-9am', 'Monday 9-10am']
+       got     : ['Monday 8-9am', 'Monday 9-10am']
+
+[pass] Joe's day off list contains 6 holidays for 2026
+       fed in  : From his settings file: ['2026-01-01', '2026-05-25', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25']
+       expected: yes
+       got     : yes
+
+[pass] Maria's extra days off are included too
+       fed in  : Her settings say extra = 08/24/2026,08/25/2026 - her own holiday
+       expected: yes
+       got     : yes
+
+[pass] a morning window that finishes BEFORE lunch is allowed
+       fed in  : 6am + her 2h notice = 8am. An 8-11am window finishes before her 12:00 lunch, so it is fine. The next one, 11am-2pm, would run through it - so the agent jumps to 1pm instead
+       expected: ['today 8-11am', 'today 1-4pm', 'tomorrow 7-10am']
+       got     : ['today 8-11am', 'today 1-4pm', 'tomorrow 7-10am']
+
+[pass] a window that would run through lunch is skipped
+       fed in  : 8am + 2h notice = 10am. A 10am-1pm window covers her whole 12-1 lunch, so it is refused and the day restarts at 1pm
+       expected: ['today 1-4pm', 'today 4-7pm', 'tomorrow 7-10am']
+       got     : ['today 1-4pm', 'today 4-7pm', 'tomorrow 7-10am']
+
+[pass] no window of Maria's overlaps 12:00-13:00
+       fed in  : Checked every window she would ever be offered that day: today 8-11am, today 1-4pm, tomorrow 7-10am, tomorrow 1-4pm, Thursday 7-10am, Thursday 1-4pm
+       expected: yes
+       got     : yes
+
+[pass] explains a holiday delay instead of just looking slow
+       fed in  : Customer emails Thursday 2 July 2026 at 4pm and is offered Monday. Without an explanation the plumber looks slow. The email said:
+            Hi John,
+            
+            Thanks for reaching out about your leak.
+            
+            We're closed Friday for the 4th of July, so the earliest I can get someone to you is:
+              1 - Monday 8-9am
+              2 - Monday 9-10am
+            
+            Just reply with 1 or 2 and I'll lock it in.
+            
+            - Joe's Plumbing
+       expected: yes
+       got     : yes
+
+[pass] names the right holiday, not a generic 'we're closed'
+       fed in  : Customer emails the day before Thanksgiving 2026
+       expected: yes
+       got     : yes
+
+[pass] customer emailing ON the holiday is told it's today
+       fed in  : Customer emails at 10am on Thanksgiving Day itself. The email said:
+            Hi John,
+            
+            Thanks for reaching out about your leak.
+            
+            We're closed today for Thanksgiving, so the earliest I can get someone to you is:
+              1 - tomorrow 8-9am
+              2 - tomorrow 9-10am
+            
+            Just reply with 1 or 2 and I'll lock it in.
+            
+            - Joe's Plumbing
+       expected: yes
+       got     : yes
+
+[pass] ...and is still offered the next working times
+       fed in  : Being closed today must not mean the customer is left with nothing
+       expected: yes
+       got     : yes
+
+[pass] works for Christmas too, not just Thanksgiving
+       fed in  : Customer emails at 9am on Christmas Day 2026, which is a Friday
+       expected: yes
+       got     : yes
+
+[pass] says nothing about holidays on an ordinary day
+       fed in  : Customer emails Tuesday 11 Aug 2026, an ordinary working day. The email opened with: "I can get someone out to you:"
+       expected: yes
+       got     : yes
+
+[pass] Joe's lunch hour is never offered to a customer
+       fed in  : Six windows from Tuesday 10am, which is late enough to reach lunchtime. His settings say lunch_start 12:00, lunch_end 13:00. Until 18 Aug both were blank, so the agent believed he worked 8 to 5 without eating and would happily promise somebody 12-2pm
+       expected: yes
+       got     : yes
+
+[pass] a good settings file reports no problems at all
+       fed in  : Joe's real settings file
+       expected: 0
+       got     : 0
+
+[pass] a second good file is judged on its own, not the first one's faults
+       fed in  : Maria's file, checked straight after Joe's - proves problems from one client don't leak into the next
+       expected: 0
+       got     : 0
+
+[pass] the deliberately broken file reports 10 problems
+       fed in  : clients/EXAMPLE-broken-on-purpose.ini, which contains the mistakes a person actually makes filling one in for the first time
+       expected: 10
+       got     : 10
+
+[pass] catches an email address with no @ in it
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a timezone that doesn't exist
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a misspelled day of the week
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a time written as 8am instead of 08:00
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a lunch break with only one end filled in
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a number written as a word
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a required question left blank
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a holiday name it doesn't know
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] catches a date written the British way round
+       fed in  : All problems found in the broken file: owner_email (under [business]) says "dave.miller.plumbing", which is not an email address | timezone (under [hours]) says "America/Ohio", which is not a timezone the computer knows | working_days (under [hours]) contains "mun", which is not a day | working_days (under [hours]) contains "thurs", which is not a day | start (under [hours]) says "8am", which is not a time | lunch_start / lunch_end (under [hours]) only one of the two is filled in | minimum_notice_hours (under [booking]) says "four", which is not a number | missing_urgency (under [questions]) is missing or left blank | observed (under [holidays]) contains "4th of july", which is not a holiday name I know | extra (under [holidays]) contains "25/12/2026", which is not a date I can read
+       expected: yes
+       got     : yes
+
+[pass] every problem comes with the exact line to write instead
+       fed in  : So you can fix it on the call without knowing anything technical
+       expected: yes
+       got     : yes
+
+[pass] a reply is stamped as answering the customer's own email
+       fed in  : A reply to Angela, who wrote in from angela@example.com. Her email carried the reference number <abc123@mail.gmail.com>
+       expected: <abc123@mail.gmail.com>
+       got     : <abc123@mail.gmail.com>
+
+[pass] the conversation so far is carried along too
+       fed in  : The same reply. 'References' is the whole conversation, oldest first, so a long back-and-forth stays as ONE conversation instead of splitting in half partway through
+       expected: <abc123@mail.gmail.com>
+       got     : <abc123@mail.gmail.com>
+
+[pass] a longer conversation keeps every message in order
+       fed in  : The third reply in a conversation that already had two messages in it
+       expected: <first@mail> <second@mail> <third@mail>
+       got     : <first@mail> <second@mail> <third@mail>
+
+[pass] no stamp is invented when there is nothing to answer
+       fed in  : A forwarded enquiry, where the reference number belongs to the office assistant's email and not to anything the customer ever saw. Claiming to answer a conversation she was never part of helps nobody
+       expected: no stamp at all
+       got     : yes
+
+[pass] the reply still says who it is from
+       fed in  : The same reply - the ordinary parts must not break because of the threading change
+       expected: joe@joesplumbing.com
+       got     : joe@joesplumbing.com
+
+[pass] the reply still goes to the right person
+       fed in  : The same reply
+       expected: rosa@example.com
+       got     : rosa@example.com
+
+[pass] the message body survives intact
+       fed in  : The same reply - the words the customer actually reads
+       expected: yes
+       got     : yes
+
+======================================================================
+  92 passed, 0 failed, 92 total
+======================================================================
+
+======================================================================
+  PART 2B - THE DIARY AND THE DRIVING
+  Checks it knows WHERE the customer is, and WHEN the
+  plumber is actually free. None of these touch Google -
+  they run on made-up calendar entries and a zip code file.
+======================================================================
+
+======================================================================
+  THE DIARY AND THE DRIVING
+  Does the agent know where the customer is, and when the
+  plumber is actually free?
+======================================================================
+
+[pass] pulls the zip out of a normal American address
+       fed in  : Fed in the address a customer would actually type
+       expected: 44107
+       got     : 44107
+
+[pass] understands a ZIP+4
+       fed in  : The "+4" is a delivery route and says nothing about position, so it is thrown away
+       expected: 44107
+       got     : 44107
+
+[pass] says nothing when there is no address
+       fed in  : A customer who never mentioned where they live. Guessing would be worse than admitting we don't know
+       expected: None
+       got     : None
+
+[pass] is not fooled by a house number that looks like a zip
+       fed in  : Both numbers are five digits. The zip is the one at the END of a US address, and the one the agent must use
+       expected: 44113
+       got     : 44113
+
+[pass] handles being given nothing at all
+       fed in  : A lead where the address field was empty. Must not crash
+       expected: None
+       got     : None
+
+[pass] the next suburb is a short drive
+       fed in  : Joe: based in zip 44113 (downtown Cleveland), will travel up to 90 minutes, assumes 40mph, works Mon-Fri 8am-5pm with lunch 12-1. Downtown Cleveland (44113) to Lakewood (44107) is about 7 road miles. The agent said 15 minutes; the real drive is about 10
+       expected: between 10 and 20 minutes
+       got     : yes
+
+[pass] the outer suburbs are reachable, not rejected
+       fed in  : Downtown Cleveland to Bay Village (44140), about 16 road miles. The agent said 25 minutes; the real drive is about 20-25 on I-90. THIS CHECK EXISTS BECAUSE IT ONCE FAILED: with the speed set to 30mph the agent called it 35 minutes and turned the customer away
+       expected: between 20 and 35 minutes
+       got     : yes
+
+[pass] a job across the city is still worth doing
+       fed in  : Downtown Cleveland to Mentor (44060), about 30 road miles. Agent said 50 minutes, and Joe will travel up to 90
+       expected: within his 90 minute limit
+       got     : yes
+
+[pass] the other end of the state is not
+       fed in  : Cleveland to Columbus (43215), about 163 road miles. Agent said 245 minutes. (The real drive is nearer 135 - our estimate is poor over long distances, which is why the customer is never told the number)
+       expected: beyond his 90 minute limit
+       got     : yes
+
+[pass] the same zip is never zero minutes
+       fed in  : Two jobs in the same zip code. Even next door takes a few minutes to park and carry the tools in, so the floor is 5 minutes
+       expected: 5
+       got     : 5
+
+[pass] an unknown zip falls back to his standard gap
+       fed in  : A zip that is not in the file at all. A sensible standard gap beats a made-up number
+       expected: 30
+       got     : 30
+
+[pass] a customer down the road is accepted
+       fed in  : Joe: based in zip 44113 (downtown Cleveland), will travel up to 90 minutes, assumes 40mph, works Mon-Fri 8am-5pm with lunch 12-1. Lakewood is 7 miles away
+       expected: False
+       got     : False
+
+[pass] a customer in the outer suburbs is accepted
+       fed in  : Bay Village, 16 miles. Turning these away would cost Joe some of his best-paying work
+       expected: False
+       got     : False
+
+[pass] a customer two hours away is turned away
+       fed in  : Columbus. Better a polite no in 60 seconds than a job he resents
+       expected: True
+       got     : True
+
+[pass] a customer in California is turned away
+       fed in  : Beverly Hills, 2,600 miles. Somebody filled in the wrong form
+       expected: True
+       got     : True
+
+[pass] an unknown zip is NOT turned away
+       fed in  : A zip missing from our file. Refusing a real customer because a data file has a gap is a far worse mistake than driving further than usual
+       expected: False
+       got     : False
+
+[pass] a customer with no address at all is NOT turned away
+       fed in  : We cannot judge what we do not know. The agent asks for the address instead
+       expected: False
+       got     : False
+
+[pass] a client whose settings predate all this still works
+       fed in  : Maria's settings file has no [travel] section - she was never asked how far she travels. An older settings file must never crash the agent, and must never turn a customer away on a question nobody put to her
+       expected: False
+       got     : False
+
+[pass] a clear afternoon does not clash
+       fed in  : Joe is booked 9-10am. Asked about 2-3pm the same day
+       expected: None
+       got     : None
+
+[pass] a job on top of another one clashes
+       fed in  : Joe is booked 9-10am. Asked about 9:30-10:30, which lands on top of it
+       expected: yes
+       got     : yes
+
+[pass] back-to-back is fine when there is no travel time
+       fed in  : Joe is booked 9-10am. Asked about 10-11am with zero travel allowed - he walks out of one and into the next
+       expected: None
+       got     : None
+
+[pass] back-to-back CLASHES once travel time is allowed for
+       fed in  : The same 10-11am slot, but Joe needs 30 minutes to drive. He cannot be in two places at once. THIS is the fault that would have made him late to every second job
+       expected: yes
+       got     : yes
+
+[pass] says exactly when he is next genuinely free
+       fed in  : Booked until 10am, needs 30 minutes to drive, so he is free at 10:30
+       expected: 2026-08-19 10:30:00-04:00
+       got     : 2026-08-19 10:30:00-04:00
+
+[pass] an ordinary job blocks exactly its own hour
+       fed in  : A normal 9-10am entry in the plumber's calendar
+       expected: ['Wed 19 Aug 09:00-10:00']
+       got     : ['Wed 19 Aug 09:00-10:00']
+
+[pass] an all-day entry blocks the whole day
+       fed in  : An all-day entry, which is how a plumber marks a big job, a holiday or a hospital appointment. Google gives no times at all, so it must block the entire day rather than a moment of it
+       expected: ['Thu 20 Aug 00:00-00:00']
+       got     : ['Thu 20 Aug 00:00-00:00']
+
+[pass] an entry he marked FREE does not block anything
+       fed in  : A birthday reminder, marked 'Free' in Google Calendar. He is telling us he can still work. Believe him
+       expected: []
+       got     : []
+
+[pass] a cancelled job does not block anything
+       fed in  : A job he deleted. Google still sends it in the feed, and blocking it would cost him a slot he had deliberately freed up
+       expected: []
+       got     : []
+
+[pass] a broken entry is skipped rather than crashing
+       fed in  : An entry with no start or end at all. One bad row must never stop the agent answering the rest of the day's customers
+       expected: []
+       got     : []
+
+[pass] the booked hour and the drive around it are both skipped
+       fed in  : Joe: based in zip 44113 (downtown Cleveland), will travel up to 90 minutes, assumes 40mph, works Mon-Fri 8am-5pm with lunch 12-1. He is booked 9-10am and a customer emails at 8am. 1 hour's notice allows 9am, but that is taken; +30 minutes to drive means 10:30 is the first honest offer. Got: ['Wed 19 Aug 10:30-11:30', 'Wed 19 Aug 13:00-14:00', 'Wed 19 Aug 14:00-15:00']
+       expected: ['Wed 19 Aug 10:30-11:30']
+       got     : ['Wed 19 Aug 10:30-11:30']
+
+[pass] a day booked wall-to-wall offers nothing at all that day
+       fed in  : Thursday 20 Aug is booked 8am-5pm solid. Nothing on Thursday may be offered. Got: ['Wed 19 Aug 09:00-10:00', 'Wed 19 Aug 10:00-11:00']
+       expected: yes
+       got     : yes
+
+[pass] a job spanning two days blocks BOTH days
+       fed in  : A whole-house repipe running Monday 8am to Tuesday 5pm. Neither day may be offered. Got: ['Wed 26 Aug 08:00-09:00', 'Wed 26 Aug 09:00-10:00']
+       expected: yes
+       got     : yes
+
+[pass] knowing the diary changes the answer
+       fed in  : The same customer, same moment, with and without reading the calendar.
+         Blind : ['Wed 19 Aug 09:00-10:00', 'Wed 19 Aug 10:00-11:00', 'Wed 19 Aug 11:00-12:00']
+         Seeing: ['Wed 19 Aug 10:30-11:30', 'Wed 19 Aug 13:00-14:00', 'Wed 19 Aug 14:00-15:00']
+       expected: yes
+       got     : yes
+
+[pass] an empty diary behaves exactly as before
+       fed in  : A plumber with nothing booked. Reading an empty calendar must not change a thing
+       expected: ['Wed 19 Aug 09:00-10:00', 'Wed 19 Aug 10:00-11:00', 'Wed 19 Aug 11:00-12:00']
+       got     : ['Wed 19 Aug 09:00-10:00', 'Wed 19 Aug 10:00-11:00', 'Wed 19 Aug 11:00-12:00']
+
+[pass] a job on the same street is offered at the very next slot
+       fed in  : Joe finishes at 10am in zip 44113 and the new customer is also in 44113 - a 5 minute drive, so he is free at 10:05. Appointments start every 30 minutes, so 10:00 is too early and 10:30 is the next honest offer. A short drive gets absorbed by the grid, which is exactly why it is not worth measuring drives to the minute
+       expected: ['Wed 19 Aug 10:30-11:30']
+       got     : ['Wed 19 Aug 10:30-11:30']
+
+[pass] a job across the city pushes the next one much later
+       fed in  : The same 9-10am job, but that customer is in Mentor (44060), 30 miles from the new one. Roughly a 50 minute drive, so the earliest honest offer is 11
+       expected: ['Wed 19 Aug 11:00-12:00']
+       got     : ['Wed 19 Aug 11:00-12:00']
+
+[pass] a long drive DOES change the answer
+       fed in  : Same plumber, same diary, same moment - only the distance between the two customers changed. Short drives vanish into the 30-minute grid; long ones do not, which is where knowing the real distance earns its keep.
+         Next door  : ['Wed 19 Aug 10:30-11:30']
+         Across town: ['Wed 19 Aug 11:00-12:00']
+       expected: yes
+       got     : yes
+
+[pass] a diary entry with no address falls back to the standard gap
+       fed in  : Joe left the location blank on his own calendar entry, which is what most plumbers do. The agent uses his standard 30 minute gap rather than guessing, so 10:30 is the first offer
+       expected: ['Wed 19 Aug 10:30-11:30']
+       got     : ['Wed 19 Aug 10:30-11:30']
+
+[pass] a nearby customer is offered times
+       fed in  : Ann in Lakewood, 7 miles away. She should get appointment times
+       expected: yes
+       got     : yes
+
+[pass] a faraway customer is offered nothing
+       fed in  : Ann in Columbus, 163 miles away. Offering her a time would either waste Joe's whole day or leave her waiting
+       expected: 0
+       got     : 0
+
+[pass] she is told she is outside the area, politely
+       fed in  : The same Columbus lead. The email said:
+            Hi Ann,
+            
+            Thanks for reaching out about your faucet issue.
+            
+            Unfortunately you're outside the area we cover, and we keep to jobs closer to home so we can turn up when we say we will.
+            
+            Sorry we can't help this time, and I hope you get it sorted quickly.
+            
+            - Joe's Plumbing
+       expected: yes
+       got     : yes
+
+[pass] the customer is NOT told our guessed drive time
+       fed in  : The same email. Our estimate called Cleveland-to-Columbus a 4 hour drive when it is really about 2h15. Telling a customer that makes the plumber look like he doesn't know his own state
+       expected: yes
+       got     : yes
+
+[pass] but the plumber IS told how far it was
+       fed in  : The same lead, from Joe's side. He gets the number (245 minutes) in case he fancies the job anyway - it is his business, not the agent's
+       expected: yes
+       got     : yes
+
+----------------------------------------------------------------------
+  42 passed, 0 failed, 42 total
+----------------------------------------------------------------------
+
+
+======================================================================
+  PART 3 - THE WHOLE AGENT, ON REAL EMAIL
+  Emails typed by hand in Gmail and sent to the test inbox
+  joesplumbingtest2026@gmail.com, then run_agent.py was started
+  and left to find them on its own.
+
+  Run on 13 August 2026 at 11:23AM (laptop time)
+  The agent reported the client's time as: Thursday 13 Aug, 01:53AM EDT
+  Mode: PRACTICE - it wrote every reply but sent nothing to anybody.
+
+  This round covered GROUP A only (the three everyday cases) from
+  emails-to-send-by-hand.md. Groups B, C, D and E are still to come.
+======================================================================
+
+[pass] A1. A complete website form - nothing missing
+       fed in  : an email sent by hand from Roshan's personal Gmail, reading -
+            Subject: New Contact Form Submission
+
+            Name: Angela Foster
+            Phone: (216) 555-0143
+            Email: angela.foster@example.com
+            Service Needed: Water Heater Repair
+            Address: 1420 Fairmount Blvd, Cleveland OH 44118
+            When do you need this work done?: This week
+            Message: No hot water since Sunday.
+       expected: treated as a real lead; reply names the job as "your water
+                 heater repair"; two appointment windows offered; and NO extra
+                 question asked, because the form already gave the address and
+                 the timing
+       got     : treated as a real lead. Reply written to
+                 angela.foster@example.com
+                 Subject: Re: your water heater repair
+                 -----------------------------------------------------------
+                 Hi Angela,
+
+                 Thanks for reaching out about your water heater repair.
+
+                 I can get someone out to you:
+                   1 - today 8-10am
+                   2 - today 10am-12pm
+
+                 Just reply with 1 or 2 and I'll lock it in.
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 No extra question was asked. Correct.
+       also    : logged in leads.csv with phone (216) 555-0143, address
+                 "1420 Fairmount Blvd, Cleveland OH 44118", timing "This week".
+                 It replied to the address in the form's Email field, not to
+                 the Gmail account that actually sent it. That is the right
+                 order of preference.
+
+[pass] A2. A form with the address missing
+       fed in  : an email sent by hand, reading -
+            Subject: New Contact Form Submission
+
+            Name: Kenneth Boyle
+            Phone: (440) 555-0166
+            Email: k.boyle@example.com
+            Service Needed: Toilet Installation
+            Message: Replacing the downstairs toilet.
+       expected: exactly ONE extra question, and it must be the zip code.
+                 Not two questions - a wall of questions makes a customer
+                 give up and ring somebody else.
+       got     : Reply written to k.boyle@example.com
+                 Subject: Re: your toilet installation
+                 -----------------------------------------------------------
+                 Hi Kenneth,
+
+                 Thanks for reaching out about your toilet installation.
+
+                 I can get someone out to you:
+                   1 - today 8-10am
+                   2 - today 10am-12pm
+
+                 Just reply with 1 or 2 and I'll lock it in.
+
+                 Also, what's your zip code?
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 One question. The zip code. Correct.
+
+[pass] A3. Somebody just typing, with no form at all  (guards Bug E)
+       fed in  : an email sent by hand, reading -
+            Subject: need help
+
+            Hi, I'm Marcus. My toilet won't stop running and it's driving me
+            mad. Can someone come take a look? 216-555-0921 is my number.
+       expected: the reply must open "Hi Marcus," - NOT "Hi there". Bug E was
+                 the agent failing to pull a name out of ordinary writing, so
+                 a real person got greeted like a stranger by a machine.
+       got     : Reply written to roshansinghkandra18@gmail.com
+                 Subject: Re: your toilet issue
+                 -----------------------------------------------------------
+                 Hi Marcus,
+
+                 Thanks for reaching out about your toilet issue.
+
+                 I can get someone out to you:
+                   1 - today 8-10am
+                   2 - today 10am-12pm
+
+                 Just reply with 1 or 2 and I'll lock it in.
+
+                 Also, what's your zip code?
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 Opens "Hi Marcus,". Bug E has not come back.
+       also    : it found the phone number 216-555-0921 from loose text with
+                 no label in front of it, and worked out the job was the
+                 toilet from the words alone. It asked for the zip code,
+                 which is right - Marcus never gave an address.
+                 It replied to the Gmail account that sent it, because this
+                 message had no Email field to use instead. Correct.
+
+[pass] B7. The clock  (guards Bug K) - no email needed, checked every run
+       fed in  : nothing. This is read off the agent's header when it starts.
+       expected: the header must show OHIO time, and it must NOT match the
+                 laptop clock. If it ever matches, the timezone fix has
+                 broken and every appointment time the agent offers is wrong.
+       got     : header said "Thursday 13 Aug, 01:53AM EDT" while the laptop
+                 clock said 11:23. Different, as they should be. Correct.
+
+[pass] Junk arriving alongside the real thing
+       fed in  : two emails nobody sent on purpose - almost certainly Google's
+                 own welcome and security-alert messages, created when the
+                 test Gmail account was set up.
+       expected: thrown away quietly. No reply, no row in the spreadsheet,
+                 nothing in the review pile.
+       got     : both marked SKIP_NOT_LEAD, reason "not enough to identify a
+                 genuine enquiry". No reply written for either. Correct.
+       note    : the exact contents of those two were not opened and read, so
+                 this is a reasonable assumption rather than a confirmed fact.
+
+----------------------------------------------------------------------
+  GROUP A TOTALS: 5 checked, 5 passed, 0 failed
+----------------------------------------------------------------------
+
+
+======================================================================
+  PART 3, GROUP B - ONE EMAIL PER BUG WE ALREADY FIXED
+  The regression guards. If one of these fails, something we already
+  fixed has come back.
+
+  Run on 13 August 2026, 4:04PM and 4:28PM (laptop time)
+  The agent reported the client's time as: Thursday 13 Aug, 06:34AM
+  and 06:57AM EDT
+  Mode: PRACTICE - it wrote every reply but sent nothing to anybody.
+
+  Sent in one batch of six. Two did not arrive first time - see the
+  spam section at the end of Group B, which is the real finding here.
+======================================================================
+
+[pass] B1. Supplier junk mail  (guards Bug A)
+       fed in  : an email sent by hand, reading -
+            Subject: September deals on copper fittings
+
+            Hi there,
+            Our autumn sale is now on. Message us about bulk pricing on
+            plumbing supplies.
+       expected: binned silently. No reply written, no row in leads.csv,
+                 nothing in the review pile.
+                 The bug was: the agent saw the word "plumbing" and replied
+                 to an advertisement, as though a supplier touting for
+                 business were a customer with a leak.
+       got     : SKIP_NOT_LEAD, reason "not enough to identify a genuine
+                 enquiry". No reply. No spreadsheet row. Correct.
+
+[pass] B2. Phishing  (guards Bug D)
+       fed in  : an email sent by hand, reading -
+            Subject: URGENT: account verification required
+
+            Dear Customer,
+            Please confirm your details immediately to avoid suspension.
+            Contact: support@prize-notification.example.com
+            Phone: 1-800-555-0199
+       expected: binned. And specifically NOT put in the review pile.
+                 The bug was: spam kept landing in needs_review.log until
+                 the pile was so full of rubbish the plumber stopped
+                 opening it - at which point a genuine unclear enquiry
+                 sitting in there would never be seen either.
+       got     : SKIP_NOT_LEAD, reason "not enough to identify a genuine
+                 enquiry". needs_review.log does not exist at all, so
+                 nothing was ever added to it. Correct.
+       note    : GOOGLE PUT THIS EMAIL IN SPAM. The agent never saw it on
+                 the first run. See the spam finding at the end of Group B.
+
+[pass] B3. Three email addresses in one message  (guards Bugs B and F)
+       THE SINGLE MOST IMPORTANT TEST IN THE SET
+       fed in  : an email sent by hand from Roshan's personal Gmail,
+                 imitating an assistant forwarding a website enquiry -
+            Subject: Fwd: New Contact Form Submission
+
+            Dave - another one for you.
+
+            ---------- Forwarded message ----------
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+
+            Name: Nadia Kaur
+            Phone: (216) 555-0490
+            Email: nadia.kaur@example.com
+            Service Needed: Shower Valve Replacement
+            Message: Shower handle spins without turning the water on.
+       expected: the reply must go to nadia.kaur@example.com.
+                 There are THREE addresses in this one email: Roshan's
+                 (the sender), the website robot's, and Nadia's. Only the
+                 third is a customer.
+                 If it picks the sender, the customer never hears back.
+                 If it picks the robot, the reply lands in a mailbox nobody
+                 reads - and it LOOKS like it worked, because an email was
+                 written and a spreadsheet row appeared. The plumber would
+                 swear the agent was running fine while every forwarded
+                 lead silently died.
+       got     : Reply written to nadia.kaur@example.com
+                 Subject: Re: your shower valve replacement
+                 -----------------------------------------------------------
+                 Hi Nadia,
+
+                 Thanks for reaching out about your shower valve replacement.
+
+                 I can get someone out to you:
+                   1 - today 11am-1pm
+                   2 - today 1-3pm
+
+                 Just reply with 1 or 2 and I'll lock it in.
+
+                 Also, what's your zip code?
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 Correct address. Bugs B and F have not come back.
+
+[pass] B4. A forwarded enquiry with NO customer email  (guards Bugs C and F)
+       fed in  : an email sent by hand, reading -
+            Subject: Fwd: New Contact Form Submission
+
+            Dave - can you handle this one?
+
+            ---------- Forwarded message ----------
+            From: noreply@joesplumbing.com
+            Subject: New Contact Form Submission
+
+            Name: Rosa Delgado
+            Phone: (216) 555-0234
+            Service Needed: Toilet Installation
+       expected: the plumber gets a "CALL THIS PERSON" alert with Rosa's
+                 number, and NO email is written at all. Rosa gave no email
+                 address, and the only addresses available belong to the
+                 forwarder and a robot - replying to either is worse than
+                 not replying.
+       got     : >>> FOR THE PLUMBER: CALL THIS PERSON - no email address
+                 Name  : Rosa Delgado
+                 Phone : (216) 555-0234
+                 Job   : Toilet Installation
+                 No customer email was written. Correct - this is the one
+                 test that proves the no-email path on real mail.
+
+[pass] B5. Nothing to go on  (guards Bugs G and H)
+       fed in  : an email sent by hand, reading -
+            Subject: hi
+
+            call me
+       expected: the agent writes replies like a form letter with blanks -
+                 "Hi ____, thanks for reaching out about your ____." The
+                 bugs were what happened when a blank had nothing to fill
+                 it: the reply came out as "your your plumbing job" with
+                 the word doubled, and elsewhere as "about plumbing job"
+                 with the "your" missing entirely. Either way the customer
+                 knows instantly they are talking to a broken machine, and
+                 does not reply.
+                 So: exactly one "your". Never two. Never none.
+       got     : Reply written to roshansinghkandra18@gmail.com
+                 Subject: Re: your plumbing issue
+                 -----------------------------------------------------------
+                 Hi there,
+
+                 Thanks for reaching out about your plumbing issue.
+
+                 I can get someone out to you:
+                   1 - today 11am-1pm
+                   2 - today 1-3pm
+
+                 Just reply with 1 or 2 and I'll lock it in.
+
+                 Also, what's your zip code?
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 One "your" in the subject, one in the body. Bugs G and H
+                 have not come back.
+       note    : the hand-send guide said to expect the words "plumbing
+                 JOB" and the agent actually says "plumbing ISSUE". The
+                 wording drifted at some point after the guide was written.
+                 Not a fault - the thing being guarded is the doubled or
+                 missing "your", which is clean. The guide has been
+                 corrected to match.
+       note    : with no name to use, it opens "Hi there," which is the
+                 right fallback. Bug E was about failing to find a name
+                 that WAS there; here there genuinely is none.
+
+[pass] B6. Flooding  (guards Bugs I and J)
+       fed in  : an email sent by hand, reading -
+            Subject: New Contact Form Submission
+
+            Name: Angela Foster
+            Phone: (216) 555-0143
+            Email: angela.foster@example.com
+            Service Needed: Burst Pipe
+            Message: The basement is flooding, water everywhere, please
+            hurry.
+       expected: FOUR things at once - flag it as an emergency; name the
+                 job as the burst pipe rather than a generic "plumbing
+                 job"; alert the plumber using the customer's OWN WORDS so
+                 he can judge the panic himself; and offer NO appointment
+                 times, because a flooding basement must never be asked to
+                 pick between Tuesday and Wednesday.
+       got     : >>> FOR THE PLUMBER: EMERGENCY - CALL NOW
+                 Name  : Angela Foster
+                 Phone : (216) 555-0143
+                 Job   : Burst Pipe
+                 Said  : "The basement is flooding, water everywhere,
+                          please hurry."
+                 (a holding reply has already gone to the customer)
+
+                 Reply written to angela.foster@example.com
+                 Subject: Re: your burst pipe
+                 -----------------------------------------------------------
+                 Hi Angela,
+
+                 Thanks for reaching out about your burst pipe - that
+                 sounds urgent, so I've flagged it straight away.
+
+                 Someone from Joe's Plumbing will call you shortly to get
+                 to you as fast as possible.
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 All four. No times offered. Her own words quoted back to
+                 the plumber. Bugs I and J have not come back.
+       also    : logged in leads.csv with emergency marked YES and the
+                 action recorded as EMAIL_AND_ALERT, not just EMAIL.
+
+[pass] B7. The clock  (guards Bug K) - no email needed, checked every run
+       fed in  : nothing. Read off the agent's header when it starts.
+       expected: Ohio time, and it must NOT match the laptop clock.
+       got     : run 1 - header "Thursday 13 Aug, 06:34AM EDT", laptop 16:04
+                 run 2 - header "Thursday 13 Aug, 06:57AM EDT", laptop 16:28
+                 Different both times, by the right amount. Correct.
+
+----------------------------------------------------------------------
+  GROUP B TOTALS: 7 checked, 7 passed, 0 failed
+----------------------------------------------------------------------
+
+======================================================================
+  THE REAL FINDING FROM GROUP B - MAIL THE AGENT CANNOT SEE
+  Found by sending six emails and only four arriving. No test would
+  ever have caught this, because every test until now handed the agent
+  an email directly instead of making it go and find one.
+======================================================================
+
+  WHAT HAPPENED
+    Six emails were sent in one batch. The agent processed four.
+    The phishing one (B2) had been put straight into SPAM by Google
+    and the agent never saw it. B4 was simply slow to arrive.
+
+    Roshan dragged B2 out of Spam and back into the Inbox. The agent
+    was run again and still did not see it - because dragging it out
+    of Spam marks it as READ, and the agent only ever looks at UNREAD
+    mail. Marking it unread by hand finally let the agent find it.
+
+  WHY THE AGENT ONLY READS UNREAD MAIL
+    That is deliberate and it is load-bearing. It is what stops the
+    agent replying to the same customer over and over every minute of
+    every day. Remove it carelessly and the first thing that happens
+    is a customer gets forty identical emails.
+
+  THE TWO HOLES THIS OPENS
+    1. Anything Google decides is spam is invisible to the agent. A
+       real customer whose enquiry is misfiled gets no reply at all.
+    2. Anything already marked read is invisible. So if the plumber
+       rescues a lead from his own spam folder - or simply opens his
+       email on his phone before the agent gets to it - the agent
+       walks straight past it and never replies.
+
+  WHY THAT IS SERIOUS, NOT COSMETIC
+    In both cases the plumber believes the agent handled it. There is
+    no error, no warning, nothing in the review pile. The lead just
+    quietly never gets a reply, and the customer rings somebody else.
+    The whole product is sold on "every enquiry answered in 60
+    seconds". This is the failure mode that breaks that promise while
+    looking like everything is fine.
+
+  STATUS: FIXED AND PROVEN ON REAL EMAIL the same day. Roshan asked for
+  it to be fixed straight away rather than deferred, on the grounds that
+  it will happen to a real client. See GROUP S below for the two tests
+  that prove it.
+
+  WHAT THE FIX ACTUALLY DOES
+    The agent no longer uses Gmail's read/unread mark as its memory.
+    It keeps its own private list of every message it has already dealt
+    with, written to already-handled.txt, and looks at all mail from the
+    last 3 days in BOTH the Inbox AND the Spam folder. Whether the
+    plumber has opened something no longer has any bearing on whether
+    the customer gets answered.
+
+    The read/unread mark is still set on inbox mail after answering, so
+    the plumber's unread count still means something. Spam is left
+    strictly alone - the agent does not reorganise a folder it was never
+    asked to touch.
+
+  THE DANGER THAT HAD TO BE HANDLED
+    On its very first run the agent's list is empty, so every old email
+    in the mailbox looks new and it would answer months of history at
+    once. Instead the first run writes down everything already there as
+    "already dealt with", replies to nothing, and says so plainly on
+    screen. Proven: the first run noted 15 existing messages and wrote
+    no replies at all.
+
+======================================================================
+  PART 3, GROUP S - PROVING THE MAIL-THE-AGENT-CANNOT-SEE FIX
+  Two emails, sent one at a time, each rigged to recreate one of the
+  two ways a lead used to disappear silently.
+
+  Run on 13 August 2026, 5:28PM and 5:38PM (laptop time)
+  The agent reported the client's time as: Thursday 13 Aug, 07:57AM
+  and 08:07AM EDT
+  Mode: PRACTICE - it wrote every reply but sent nothing to anybody.
+======================================================================
+
+[pass] S1. The plumber checked his phone first
+       fed in  : an email sent by hand, reading -
+            Subject: kitchen sink blocked
+
+            Hi, this is Tom Hendry. My kitchen sink is completely blocked
+            and the water isn't going down at all. My number is
+            216-555-0177.
+
+            ...and then OPENED in the test inbox before the agent ran, so
+            Gmail marked it as read. This imitates the plumber glancing at
+            an enquiry on his phone at 7am.
+       expected: the agent finds it and replies anyway. Before the fix it
+                 only ever looked at unread mail, so this email would have
+                 been skipped permanently - while the plumber assumed it
+                 had been handled and the customer rang somebody else.
+       got     : found and answered.
+                 Reply written to roshansinghkandra18@gmail.com
+                 Subject: Re: your drain cleaning
+                 -----------------------------------------------------------
+                 Hi Tom,
+
+                 Thanks for reaching out about your drain cleaning.
+
+                 I can get someone out to you:
+                   1 - today 12-2pm
+                   2 - today 2-4pm
+
+                 Just reply with 1 or 2 and I'll lock it in.
+
+                 Also, what's your zip code?
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 threaded : yes - stamped as a reply to their own email
+                 Hole 2 is closed.
+       also    : worked out the job from ordinary words - Tom never said
+                 "drain cleaning", he said his sink was blocked. Got his
+                 name and number with no form and no labels: Tom Hendry,
+                 216-555-0177, both in leads.csv.
+                 The notice period held: Joe's time was 07:57AM and his
+                 rule is 4 hours minimum notice, so the first slot offered
+                 was 12-2pm rather than 8am.
+
+[pass] S2. Google misfiled it as spam
+       fed in  : an email sent by hand, reading -
+            Subject: water heater not working
+
+            Hi, I'm Diane Walsh. No hot water since yesterday morning, the
+            heater is making a clicking noise. Best number is
+            216-555-0388.
+
+            ...and then marked "Report spam" in the test inbox, so Gmail
+            moved it into the Spam folder. This imitates Google misfiling
+            a genuine enquiry, which happens most often to website contact
+            forms whose hosting is not set up to prove who it is.
+       expected: the agent finds it in Spam, says out loud that it did, and
+                 replies. Before the fix it only looked in the Inbox, so a
+                 misfiled customer got no reply at all and nobody ever knew
+                 the enquiry existed.
+       got     : found and answered. The output said "(found in SPAM)"
+                 before handling it.
+                 Reply written to roshansinghkandra18@gmail.com
+                 Subject: Re: your no hot water issue
+                 -----------------------------------------------------------
+                 Hi Diane,
+
+                 Thanks for reaching out about your no hot water issue.
+
+                 I can get someone out to you:
+                   1 - today 1-3pm
+                   2 - today 3-5pm
+
+                 Just reply with 1 or 2 and I'll lock it in.
+
+                 Also, what's your zip code?
+
+                 - Joe's Plumbing
+                 -----------------------------------------------------------
+                 threaded : yes - stamped as a reply to their own email
+                 Hole 1 is closed.
+       also    : name and number found from loose text: Diane Walsh,
+                 216-555-0388. Notice period held again - 08:07AM plus 4
+                 hours gave a first slot of 1-3pm.
+                 Correctly NOT treated as an emergency. "no water" is on
+                 the emergency word list but "no hot water" is a different
+                 thing - a cold shower is not a flooding basement. It read
+                 the difference.
+       WORDING PROBLEM FOUND HERE - see below.
+
+----------------------------------------------------------------------
+  GROUP S TOTALS: 2 checked, 2 passed, 0 failed
+----------------------------------------------------------------------
+
+======================================================================
+  A WORDING PROBLEM SPOTTED IN S2 - NOT A FAILURE, BUT NOT RIGHT
+======================================================================
+
+  WHERE   : test S2, Diane Walsh.
+  IT SAID : "Thanks for reaching out about your no hot water issue."
+            and the subject line "Re: your no hot water issue"
+  IT SHOULD SAY : something a plumber would actually say - "your water
+            heater" - which is also what Diane's own subject line said.
+
+  WHY IT HAPPENED
+    The agent names the job from the words the customer used. Diane
+    wrote "no hot water" in her first sentence, so that became the job
+    name and got dropped into a sentence built for names like "drain
+    cleaning" or "toilet installation". Grammatically fine. Reads like
+    a machine.
+
+  WHY IT MATTERS
+    Small, but it is the same class of problem as Bug E - the customer
+    gets a faint sense that nobody read their email. The whole selling
+    point is a reply that feels like the plumber wrote it in 60
+    seconds.
+
+  STATUS: FIXED the same day, 13 August 2026, at Roshan's instruction.
+  My advice had been to leave it until Groups C, D and E were done so
+  wording could be fixed in one pass. He overruled that and was right -
+  it is a two-line change and leaving a known machine-sounding sentence
+  in front of customers to save a batching trip is not a real saving.
+
+  WHAT THE FIX DOES
+    Some job names describe what is NOT working rather than naming a
+    thing. Said back literally they read like a machine. Those now get
+    translated into the plain English a plumber would use on the phone:
+      "No Hot Water" -> the customer reads "your water heater issue"
+      "No Water"     -> the customer reads "your water supply issue"
+
+    ONLY the words the customer reads are changed. leads.csv still
+    records "No Hot Water", because knowing the symptom before setting
+    off is worth more to the plumber than a tidy job name.
+
+  GUARDED BY THREE NEW CHECKS in Part 2 above:
+    - "'no hot water' is said the way a plumber would say it"
+    - "'no water' is said the way a plumber would say it"
+    - "the plumber's log still gets the symptom, not the tidied name"
+
+  NOTE: the S2 reply quoted above is the output from BEFORE this fix.
+  It is left exactly as it came out, as the record of what was wrong.
+  The same email today produces "Re: your water heater issue".
+
+======================================================================
+  PART 3, GROUP C - THINGS ONLY REAL EMAIL CAN BREAK
+  Eleven emails, sent in one batch. None of these could be tested with
+  a made-up sample: attachments, phone signatures, bold formatting,
+  deep reply chains, emoji, accented names, duplicates, and one wall
+  of unbroken text.
+
+  Run on 15 August 2026 at 09:18AM (laptop time)
+  The agent reported the client's time as: Friday 14 Aug, 11:48PM EDT
+  Mode: PRACTICE - it wrote every reply but sent nothing to anybody.
+
+  THIS IS THE GROUP THAT FOUND THINGS. Five passed clean, two passed
+  their written check but revealed a problem, four failed.
+======================================================================
+
+[pass] C1. With a photo attached
+       fed in  : a website form email WITH A REAL PHOTO ATTACHED -
+            Subject: New Contact Form Submission
+
+            Name: Derek Voss
+            Phone: (216) 555-0611
+            Email: d.voss@example.com
+            Service Needed: Leak Repair
+            Message: Photo attached of the damp patch under the sink.
+       expected: ignore the attachment and read the message normally.
+                 Thumbtack lets customers attach photos, so this will
+                 happen in real life.
+       got     : ignored the photo completely. Derek Voss, (216) 555-0611,
+                 Leak Repair, replied to d.voss@example.com with
+                 "Re: your leak repair". Correct.
+
+[FAIL] C2. With a phone signature
+       fed in  : an email sent by hand, reading -
+            Subject: dripping tap
+
+            Hi, this is Louise. The bathroom tap has been dripping for a
+            week. My number is 216-555-0455.
+
+            Sent from my iPhone
+       expected: not confused by the footer. Name Louise, phone
+                 216-555-0455, and a sensible job worked out from
+                 "the bathroom tap has been dripping".
+       got     : name Louise - correct. Phone 216-555-0455 - correct.
+                 The footer was ignored - correct.
+                 BUT THE JOB TYPE CAME BACK EMPTY, so the reply said:
+                   Subject: "Re: your plumbing job"
+                   Body   : "Thanks for reaching out about your plumbing
+                             job."
+                 IT SHOULD HAVE SAID something like "your dripping tap"
+                 or "your faucet issue" or "your leak".
+       why it matters : Louise wrote one clear sentence describing a
+                 dripping tap. The reply proves nobody read it. Compare
+                 with test A3, where Marcus said his toilet would not
+                 stop running and got "your toilet issue" back. A tap is
+                 no harder than a toilet - the vocabulary simply has a
+                 hole in it. "Tap" is British; Americans say "faucet",
+                 which may be exactly why it was missed.
+
+       *** FIXED 15 August 2026, the same day. ***
+       That was exactly why. The word list was built from American
+       plumbing vocabulary and Louise used the British word. Her email
+       now returns job "Faucet", so the reply reads "your faucet" - the
+       American word, because the client is American, even though she
+       wrote "tap".
+
+       Two changes:
+
+       1. MISSING EVERYDAY WORDS ADDED: tap, spigot, drip, basin,
+          cistern, gurgling, valve, backflow, dishwasher, washing
+          machine, water pressure, low pressure, no pressure, water
+          softener.
+
+       2. WORDS ARE NOW MATCHED AS WHOLE WORDS. Until today the agent
+          looked for a run of letters ANYWHERE, which was safe while
+          every word was long. "Tap" would have found "tape", "tapping"
+          and "adaptor", and turned an advert for packing tape into a
+          plumbing job - the same shape as Bug A. Endings are still
+          understood, so "leaking", "clogged" and "drips" all find
+          "leak", "clog" and "drip".
+
+       GUARDED BY FOUR NEW CHECKS in Part 1 above:
+         40. A dripping tap, described in ordinary words
+         41. A word that merely CONTAINS a job word is not a job
+         42. A blocked drain described as clogged
+         43. Low water pressure, which the word list never had
+
+       STILL TO DO: re-send C2 as a real email to confirm on live Gmail.
+
+[FAIL] C2b. With a full work signature - THE ONE WE EXPECTED TO FAIL
+       fed in  : an email sent by hand, reading -
+            Subject: leaking radiator
+
+            Hi, this is Barbara. The radiator in our back office has been
+            leaking since Monday and there's a bucket under it now. Best
+            number for me is 216-555-0644, I'm usually in after 10.
+
+            Thanks,
+
+            Barbara Nolan
+            Office Manager | Nolan & Sons Ltd
+            Tel: 216-555-9000  |  Fax: 216-555-9001
+            barbara.nolan@nolanandsons.example.com
+            www.nolanandsons.example.com
+       expected: use 216-555-0644 - the number Barbara SAID is hers. The
+                 trap is "Tel: 216-555-9000" in her signature, which is
+                 the office switchboard.
+       got     : FAILED, and worse than predicted. leads.csv records the
+                 phone as:
+                   216-555-9000  |  Fax: 216-555-9001
+                 It took the switchboard AND dragged the fax number in
+                 with it. That is not a phone number at all - it is a
+                 line of a signature block pasted into a phone field.
+                 Name "Barbara" - correct.
+                 Job "Heating" from "radiator" - sensible, arguably
+                 better than the "Leak" we predicted.
+                 Replied to barbara.nolan@nolanandsons.example.com,
+                 which is acceptable.
+       why it matters : the plumber rings a reception desk that has never
+                 heard of Barbara, gets nowhere, and gives up on the
+                 lead. It LOOKS like the agent worked - it found a name,
+                 an email and a number. Nobody can see why the job went
+                 cold. And because the field also contains the word
+                 "Fax", nobody could even dial it.
+
+       *** FIXED 15 August 2026, the same day. ***
+       Barbara's email now returns phone 216-555-0644 - the number she
+       gave. Two things changed:
+
+       1. WHERE A FACT CAME FROM NOW DECIDES WHAT IT IS WORTH.
+          Everything below a sign-off on its own line ("Thanks,",
+          "Regards," and so on) is treated as boilerplate - the block
+          that rides on every email that person sends, whether they are
+          ordering stationery or reporting a leak. Facts are now taken
+          in this order:
+             1. labelled in the message      "Phone: 216-555-0455"
+             2. recognised in the message    "my number is 216-555-0455"
+             3. labelled in the signature    "Tel: 216-555-9000"
+             4. recognised in the signature  a bare number under
+                                             "Thanks, John"
+          Steps 3 and 4 still happen. Preferring the message must never
+          mean losing the only contact details in the email - plenty of
+          people put their only number under "Thanks, John".
+
+       2. A PHONE FIELD NOW KEEPS THE NUMBER AND THROWS THE REST AWAY.
+          "Tel: 216-555-9000  |  Fax: 216-555-9001" yields
+          "216-555-9000", not the whole line. No more phone numbers with
+          the word "Fax" in them.
+
+       AND A THIRD THING ROSHAN ASKED FOR while this was being built:
+       a number that openly belongs to somebody else is now refused.
+       "You can reach my wife on 216-555-0200" no longer becomes the
+       customer's number. If EVERY number in an email belongs to a wife,
+       a landlord or an office, the agent records no number at all - the
+       plumber cold-calling a stranger who never enquired is worse than
+       the plumber having to email instead.
+
+       GUARDED BY FIVE NEW CHECKS in Part 1 above (numbers 25-29):
+         25. A work signature holding the office switchboard
+         26. The only phone number is in the signature
+         27. A number that belongs to somebody else's wife
+         28. His own number AND his landlord's
+         29. A phone field with the fax number on the same line
+
+       STILL TO DO: re-send C2b as a real email to confirm this on live
+       mail. The five checks above are automated, not real Gmail.
+
+[FAIL] C3. With bold formatting
+       fed in  : a website form email with SOME WORDS MADE BOLD in Gmail
+                 before sending, which makes Gmail send the message twice
+                 over - once as plain text and once as a web page -
+            Subject: New Website Inquiry
+
+            Name: Marcus Webb
+            Phone: (216) 555-0700
+            Email: m.webb@example.com
+            Service Needed: Drain Cleaning
+            Message: Kitchen sink is completely blocked.
+       expected: read exactly the same as plain text. Bold is decoration;
+                 it must not reach the customer's reply.
+       got     : FAILED. The bold markers came through as asterisks and
+                 were treated as part of the words.
+                 leads.csv records the name as:  *Marcus Webb*
+                 leads.csv records the phone as: * (216) 555-0700
+                 and the reply opened:
+                   "Hi *Marcus,"
+                 IT SHOULD HAVE SAID "Hi Marcus,".
+       why it matters : this is what a customer sees first. A stray
+                 asterisk in front of their own name says "a machine
+                 wrote this and nobody checked". The phone number in the
+                 plumber's spreadsheet is also unusable as written.
+                 The email address and job type survived, so this is
+                 specifically about text that had formatting on it.
+       note    : the subject wording was deliberately changed from "New
+                 Contact Form Submission" for this test, to check the
+                 agent was not secretly relying on those exact words. It
+                 was not - the form was still recognised. That part
+                 passed.
+
+       *** FIXED 15 August 2026, the same day. ***
+       Bold and italic marks are now stripped from the whole message
+       BEFORE anything is looked for, rather than cleaned off values
+       afterwards. That order matters: "Hi, I'm *Marcus*" would find no
+       name at all otherwise, because the search looks for a capital
+       letter after "I'm" and an asterisk is not one.
+
+       Email addresses are deliberately left alone. The pattern only
+       matches a mark that starts at a non-letter, so the underscore
+       inside jose_ramirez@example.com is never touched - and that is
+       the one field the entire reply depends on.
+
+       GUARDED BY THREE NEW CHECKS in Part 1 above:
+         33. A form where the labels and values were made bold
+         34. Somebody typing loosely, with their name in bold
+         35. Underscores in an email address are left alone
+
+       STILL TO DO: re-send C3 as a real email to confirm on live Gmail.
+
+[pass] C4. A reply three levels deep
+       fed in  : an email sent by hand, reading -
+            Subject: Re: Re: your water heater repair
+
+            Yes Tuesday still works.
+
+            On Tue, Aug 11, 2026 at 9:02 AM Dave Harris wrote:
+            > Sorry, can we say Tuesday instead?
+            >
+            > On Mon, Aug 10, 2026 at 2:14 PM Joe's Plumbing wrote:
+            > > Hi Dave, thanks for reaching out about your water heater
+            > > repair.
+            > > Reply 1 for Tue 2-4pm or 2 for Wed 8-10am.
+            > > Name: Dave Harris
+            > > Phone: (614) 555-0182
+       expected: recognise it as a reply and stay completely silent. The
+                 danger is that it reads Dave's name and number out of
+                 the old quoted text and greets him as a brand new
+                 stranger - about a job he has already booked.
+       got     : THREAD_REPLY, reason "reply inside an existing
+                 conversation". No reply written, no spreadsheet row.
+                 Correct.
+
+[pass] C5. Everything in the subject, nothing in the body
+       fed in  : an email sent by hand with a COMPLETELY EMPTY BODY -
+            Subject: Need a plumber for a blocked drain, call 216-555-0888
+            (no body at all)
+       expected: not crash. It will probably not have enough to work
+                 with. Whatever it decides, it must decide it calmly.
+       got     : SKIP_NOT_LEAD, reason "not enough to identify a genuine
+                 enquiry". No crash, no noise. Passes the written check.
+       BUT WORTH KNOWING : a human reading that subject line sees a real
+                 customer - a blocked drain and a phone number. The agent
+                 threw it away. It never looks at the subject line for
+                 customer details, and that is deliberate: doing so
+                 caused Bug A, where it replied to advertisements. So
+                 this is a known trade, not an accident. It is still a
+                 lost lead, and the plumber will never know it existed.
+
+[FAIL] C6. A very long subject line
+       fed in  : a website form email with an enormous subject -
+            Subject: New Contact Form Submission from the website contact
+            page regarding an urgent plumbing matter concerning the
+            downstairs bathroom and kitchen area
+
+            Name: Priya Raman
+            Phone: (614) 555-7788
+            Email: p.raman@example.com
+            Service Needed: Drain Cleaning
+       expected: cope with the long subject. Priya's actual enquiry is
+                 routine drain cleaning - she should be offered two
+                 appointment windows like anybody else.
+       got     : the long subject did not break anything - that part
+                 passed. But the agent declared an EMERGENCY:
+                   >>> FOR THE PLUMBER: EMERGENCY - CALL NOW
+                 and the reply she got was:
+                   "Thanks for reaching out about your drain cleaning -
+                    that sounds urgent, so I've flagged it straight away.
+                    Someone from Joe's Plumbing will call you shortly."
+                 NO APPOINTMENT TIMES WERE OFFERED.
+       why : the word "urgent" appears in the subject line - in the
+                 phrase "regarding an urgent plumbing matter", which is
+                 the WEBSITE's own boilerplate wording, not something
+                 Priya wrote. Emergency detection reads it anyway.
+       why it matters : this is a false alarm with two costs. The plumber
+                 is told to drop everything and call, at midnight, for a
+                 blocked drain. And Priya is denied the appointment slots
+                 she should have been offered - the agent downgraded a
+                 bookable job into a phone call. Do this to a client a
+                 few times and he stops trusting the alerts, which is
+                 exactly when the real flooding basement arrives.
+
+       *** FIXED 15 August 2026, the same day. ***
+       THE ROOT CAUSE WAS BIGGER THAN THE EMERGENCY.
+       A subject line too long to fit on one line is FOLDED by the mail
+       server - continued on the next line, indented by a space. The
+       agent knew to ignore the labelled first line and nothing else, so
+       the continuation - "regarding an urgent plumbing matter
+       concerning the downstairs..." - dropped straight into the message
+       body as though Priya had typed it herself.
+
+       That means ANY long header was leaking text into the message. It
+       happened to be the emergency detector that noticed first.
+
+       Three changes:
+
+       1. HEADERS ARE FLATTENED ONTO ONE LINE when an email is read, so
+          nothing can spill out of them in the first place.
+       2. FOLDED CONTINUATION LINES ARE DROPPED by the parser too, as a
+          second line of defence for text that arrives already folded.
+       3. EMERGENCY WORDS ARE SPLIT IN TWO, by whether they describe a
+          THING HAPPENING or only a FEELING:
+            strong - emergency, flood, flooding, flooded, burst,
+                     gushing, no water, gas leak, sewage, overflowing.
+                     Nobody writes "gushing" casually. These still fire
+                     on their own.
+            weak   - urgent, asap, right now, immediately. These turn up
+                     in marketing copy and form templates all day. They
+                     still count, but they can be argued with: "not
+                     urgent at all" no longer means urgent.
+
+       Roshan's judgement on the one downside - that a genuine emergency
+       might only say "urgent" in the subject and nothing in the body -
+       was that nobody with a flooding basement writes the word "urgent"
+       and then declines to mention the flooding. Agreed.
+
+       GUARDED BY FOUR NEW CHECKS in Part 1 above:
+         36. A long subject folded across lines must not reach the message
+         37. A customer saying it is NOT urgent
+         38. A customer who really does mean urgent
+         39. A flooding basement is still an emergency, whatever the wording
+
+       BONUS: this also fixes test D2 before it was ever sent. D2 is a
+       customer writing "Not urgent at all, just whenever you have a free
+       slot next month", which we expected to raise a false alarm.
+
+       STILL TO DO: re-send C6 as a real email to confirm on live Gmail.
+
+[pass] C7. Emoji in the message
+       fed in  : a website form email with emoji typed into it by hand -
+            Subject: New message from your website
+
+            Name: Chloe Barnett
+            Phone: (216) 555-0322
+            Email: chloe.b@example.com
+            Service Needed: Leak Repair
+            Message: Ceiling is dripping please help
+       expected: not fall over.
+       got     : did not fall over. Replied correctly to
+                 chloe.b@example.com, "Re: your leak repair", opening
+                 "Hi Chloe," - the greeting is clean because it takes the
+                 first name only.
+       BUT WORTH KNOWING : leads.csv records the name as
+                   Chloe Barnett(emoji)
+                 The emoji was swallowed into the name field. The
+                 customer never sees it, so this is cosmetic - but it is
+                 the plumber's spreadsheet, and it is wrong.
+
+       *** FIXED 15 August 2026, the same day, at Roshan's instruction.
+       His reasoning: "it doesn't look professional." ***
+       Decoration is now trimmed off the ENDS of a name, and nowhere
+       else. A name is letters from any language, spaces, apostrophes
+       and hyphens - so Jose Ramirez keeps his accents, Mary-Anne
+       O'Brien keeps both of hers, and a smiley face does not appear in
+       the plumber's spreadsheet.
+
+       EMOJI ARE STRIPPED EVERYWHERE, not only from the name. My advice
+       had been to keep them in the message body - a crying face after
+       "the ceiling is dripping please help" tells the plumber how
+       frightened the customer is. Roshan overruled that: the agent is a
+       professional service, and nothing it hands a client should have
+       smiley faces in it. The cost is real and accepted; the customer's
+       words still carry the urgency, and the emergency detector reads
+       the words, not the pictures.
+
+       Accented letters, dashes, apostrophes, currency and ordinary
+       punctuation are untouched - only the pictures go. The spacing an
+       emoji leaves behind is tidied up too, so nothing reads as
+       "please help ." with a floating full stop.
+
+       GUARDED BY FOUR NEW CHECKS in Part 1 above:
+         44. A customer who decorated her name with an emoji
+         45. Emoji in the MESSAGE are stripped too
+         46. Real names keep their apostrophes, hyphens and accents
+         47. Accents, dashes and punctuation survive the emoji strip
+
+[pass] C8. An accented name
+       fed in  : a website form email with the accents typed properly -
+            Subject: Contact Form Submission - Joe's Plumbing
+
+            Name: Jose Ramirez   (typed with the accents: J-o-s-e-acute,
+                                  R-a-m-i-acute-r-e-z)
+            Phone: (216) 555-0512
+            Email: jose.ramirez@example.com
+            Service Needed: Garbage Disposal Repair
+            Message: Disposal hums but does not turn.
+       expected: keep the accents, not turn them into gibberish. The
+                 classic failure is the name arriving as "JosA(c)" -
+                 two wrong characters where one right one should be.
+       got     : PERFECT. The reply opened "Hi Jose," with the accent
+                 intact, first name only. leads.csv shows the full name
+                 with both accents correct. The subject read
+                 "Re: your garbage disposal repair".
+       why it matters : Roshan sells to US small businesses. Hispanic
+                 surnames are everywhere in that market. A plumber in
+                 Cleveland or Tampa hits this in his first week.
+
+[pass] C9. The same enquiry twice
+       fed in  : test C1 sent again, completely unchanged - same subject,
+                 same body, same photo attached.
+       expected: treated as a second, separate lead and answered again.
+                 A website form that misfires sends duplicates, and the
+                 client needs to know what he will see.
+       got     : two separate rows in leads.csv, both Derek Voss, both
+                 answered. Correct.
+       note    : Gmail collapses the two into ONE conversation in the
+                 inbox because they share a subject. The inbox is
+                 therefore misleading - the spreadsheet is the truth.
+
+[pass] C10. One long paragraph, no line breaks
+       fed in  : an email sent by hand - one unbroken wall of text with
+                 no labels, no line breaks and no form structure -
+            Subject: plumbing question
+
+            Hello my name is Barbara Nolan and I have been having trouble
+            with my downstairs bathroom for about three weeks now, it
+            started with a slow drain which I thought was just hair so I
+            tried one of those chemical things from the hardware store
+            twice actually and it helped for maybe a day, now the toilet
+            gurgles whenever the washing machine drains which my
+            neighbour says means something about the main line, I am home
+            most days except Wednesday, my number is 216-555-0644 if that
+            is easier than email, thank you.
+       expected: still find the facts. Name from "my name is Barbara
+                 Nolan" - a third phrasing, different from "I'm Marcus"
+                 and "this is Louise". Phone from the middle of a
+                 sentence. Job worked out from a story rather than a
+                 keyword.
+       got     : name "Barbara Nolan", phone "216-555-0644", job
+                 "Toilet" from the gurgling. Reply opened "Hi Barbara,"
+                 with the subject "Re: your toilet issue". Replied to the
+                 sending account, correctly, since she gave no email
+                 address in the text.
+                 This is the hardest email in the whole set and it was
+                 handled cleanly.
+       note    : this Barbara Nolan is the same person as in C2b but a
+                 completely different email. The agent did not muddle the
+                 two - it found HER stated number here, 216-555-0644,
+                 which is the very number it FAILED to find in C2b.
+
+----------------------------------------------------------------------
+  GROUP C TOTALS: 11 checked, 7 passed, 4 failed
+  Clean passes            : C1, C4, C8, C9, C10
+  Passed but revealed a problem : C5, C7
+  Failed                  : C2, C2b, C3, C6
+----------------------------------------------------------------------
+
+======================================================================
+  WHAT GROUP C MEANS IN PLAIN ENGLISH
+======================================================================
+
+  This is the group that earned its keep. Groups A, B and S found
+  nothing new. Group C found four faults in one batch, and every one of
+  them is invisible from the plumber's side - the agent reports success
+  in all four cases.
+
+  THE FOUR FAULTS, IN THE ORDER I WOULD FIX THEM
+
+  1. C2b - THE SIGNATURE TRAP.  *** FIXED 15 August 2026 ***
+     Took the office switchboard number out of a signature instead of
+     the mobile the customer gave, and dragged the fax number along with
+     it. Highest business cost: the plumber calls a stranger, gets
+     nowhere, and the lead dies looking like a success.
+     Now fixed, plus a related case Roshan asked for - a number that
+     openly belongs to somebody else's wife or landlord is refused.
+     Five new automated checks guard it. Awaiting a real-email re-test.
+
+  2. C3 - BOLD TEXT LEAKS ASTERISKS.  *** FIXED 15 August 2026 ***
+     "Hi *Marcus," was the first thing that customer read. Formatting
+     marks are now stripped from the whole message before anything is
+     looked for. Three new automated checks guard it, including one
+     proving email addresses with underscores are left alone.
+     Awaiting a real-email re-test.
+
+  3. C6 - FALSE EMERGENCY FROM BOILERPLATE.  *** FIXED 15 August 2026 ***
+     The root cause turned out to be bigger: long headers are folded
+     across lines by the mail server, and everything after the first
+     line was leaking into the message body. Headers are now flattened
+     when read, folded lines are dropped by the parser, and emergency
+     words are split into strong ones that fire alone and weak ones that
+     can be argued with. Four new automated checks guard it, and it
+     fixes test D2 before it was ever sent. Awaiting a real-email re-test.
+
+  4. C2 - "DRIPPING TAP" NOT RECOGNISED.  *** FIXED 15 August 2026 ***
+     The reply said "your plumbing job" when the customer had described
+     the problem in one clear sentence. It was exactly what it looked
+     like: the word list was American and she used the British word.
+     Fourteen everyday words added, and words are now matched as whole
+     words rather than as letters buried inside other words - so "tap"
+     can never find "tape". Four new automated checks guard it.
+     Awaiting a real-email re-test.
+
+  TWO MORE
+
+  - C7: an emoji got swallowed into the name in the plumber's
+    spreadsheet.  *** FIXED 15 August 2026 *** at Roshan's instruction -
+    "it doesn't look professional". Decoration is trimmed off the ends
+    of names, and emoji are stripped from the message as well. He
+    overruled my advice to keep them in the message body - the agent is
+    a professional service, and nothing it hands a client should have
+    smiley faces in it.
+  - C5: an enquiry with everything in the subject and nothing in the
+    body is thrown away. STILL OPEN, and deliberately so - reading
+    subject lines for customer details is what caused Bug A, where the
+    agent replied to advertisements. It is a genuine lost lead and a
+    known trade, not an oversight.
+
+  ALL FOUR GROUP C FAILURES ARE NOW FIXED, plus C7.
+
+======================================================================
+  RE-TESTED ON LIVE GMAIL - 15 August 2026, 1:07PM (laptop time)
+  The four fixed emails sent again by hand, unchanged.
+  Client time reported: Saturday 15 Aug, 03:37AM EDT. Practice mode.
+======================================================================
+
+[pass] C2 re-test - the dripping tap
+       expected: the job named as a faucet, not "your plumbing job"
+       got     : Subject "Re: your faucet issue", body "Thanks for
+                 reaching out about your faucet issue." Job logged as
+                 Faucet, phone 216-555-0455. FIXED on live mail.
+
+[pass] C2b re-test - the signature trap
+       expected: phone 216-555-0644, the number Barbara gave - not the
+                 switchboard, and no "Fax" in the field
+       got     : leads.csv shows phone 216-555-0644. FIXED on live mail.
+
+[pass] C3 re-test - bold formatting
+       expected: the reply to open "Hi Marcus," with no asterisk
+       got     : "Hi Marcus,". Name logged as "Marcus Webb", phone as
+                 "(216) 555-0700", both clean. FIXED on live mail.
+       BUT     : see the new fault below - the asterisks moved to the
+                 email address.
+
+[pass] C6 re-test - the long subject
+       expected: two appointment windows and NO emergency alert
+       got     : "1 - Monday 8-10am, 2 - Monday 10am-12pm", no alert
+                 raised. FIXED on live mail.
+
+======================================================================
+  TWO NEW FAULTS FOUND BY THE RE-TEST, BOTH FIXED THE SAME HOUR
+  Neither existed yesterday. Both were introduced by the morning's
+  fixes - which is exactly why fixes get re-tested on real mail.
+======================================================================
+
+  1. THE ASTERISKS MOVED TO THE EMAIL ADDRESS.
+     Marcus's reply was addressed to:
+         *m.webb@example.com *
+     That is not a valid address. The reply would have bounced, while
+     the log said sent and the spreadsheet looked complete.
+
+     WHY: formatting marks are deliberately NOT stripped from the email
+     field, because an underscore is an ordinary character inside a real
+     address. That decision was right. But the general cleaner looks for
+     a matching pair like *text*, and Gmail produced "*m.webb@... *"
+     with a space before the closing star, so the pair never matched and
+     both marks survived.
+
+     FIXED by treating the address the way the phone number is already
+     treated: find the address inside the value and take only that.
+     Everything either side is packaging.
+     Guarded by checks 48 and 49 - one proving the asterisks come off,
+     one proving an address containing an underscore is still untouched.
+
+  2. THE SPREADSHEET'S COLUMN HEADINGS WERE STALE.
+     leads.csv writes its heading row once, when the file is created,
+     and never again. Four columns were added this morning, so every
+     heading pointed at the wrong column - the data all correct and all
+     mislabelled, which is worse than being wrong, because the plumber
+     cannot tell.
+
+     FIXED: at startup the agent compares the heading row against the
+     columns it is about to write, and rewrites the file if they differ,
+     slotting old rows into the right places. Nothing lost, nothing for
+     the client to do.
+
+     THIS ONE BIT TWICE. The first version assumed every row matched the
+     old heading. It did not - the file held rows of two different
+     shapes, older ones from before the columns were added and newer
+     ones written after, while the heading was still old. Reading them
+     all as the old shape shuffled the newer rows into the wrong
+     columns and made the problem worse. Now each row is matched by its
+     own shape. Proven on the real file: 23 rows kept, old and new both
+     correct, and running it a second time leaves the file alone.
+
+----------------------------------------------------------------------
+  PART 3 TOTALS SO FAR: 25 checked, 21 passed, 4 failed
+  (Group A: 5, Group B: 7, Group S: 2, Group C: 11)
+----------------------------------------------------------------------
+
+
+======================================================================
+  PART 3, GROUP D - THE KNOWN WEAK SPOTS
+  Five emails we EXPECTED to be imperfect. The point was finding out
+  exactly how imperfect, before a client did.
+
+  Run on 15 August 2026 at 1:20PM (laptop time)
+  Client time reported: Saturday 15 Aug, 03:49AM EDT. Practice mode.
+======================================================================
+
+[pass] D1. A form field literally called "Subject"
+       fed in  : Subject: Form Submission
+                 Name: Helen Ward / Phone: (330) 555-0119 /
+                 Email: helen.ward@example.com /
+                 Subject: Faucet replacement /
+                 Message: Kitchen mixer tap needs replacing.
+       expected: THE KNOWN LIMITATION TO SHOW. Anything labelled
+                 "Subject" is deliberately ignored, because reading the
+                 subject line caused Bug A. So we expected the job to
+                 fall back to a bland "your plumbing job".
+       got     : BETTER THAN EXPECTED. It read the job out of the
+                 message instead - "Kitchen mixer tap needs replacing" -
+                 and replied "Re: your faucet issue".
+       note    : this works because of the vocabulary fix made earlier
+                 the same day. "Tap" was not in the word list until this
+                 morning. THE KNOWN LIMITATION IS EFFECTIVELY GONE, as
+                 long as the customer describes the job somewhere other
+                 than a field called Subject.
+
+[pass] D2. A routine job containing the word "urgent"
+       fed in  : Name: Gerald Pike / Service Needed: Faucet Replacement /
+                 Message: Not urgent at all, just whenever you have a
+                 free slot next month.
+       expected: NO emergency. The customer went out of his way to say
+                 the opposite. This was expected to FAIL before the
+                 morning's fix.
+       got     : no alert. Two appointment windows offered. Reply read
+                 "Re: your faucet replacement".
+                 THE MORNING'S EMERGENCY FIX, PROVEN ON LIVE MAIL.
+
+[FAIL] D3. A Thumbtack-style lead
+       fed in  : Subject: New lead: Plumbing
+                 Customer: Denise W.
+                 Is any part of the building currently flooded?: No
+                 Which appliances, if any, are affected?: Kitchen faucet
+                 What type of property do you have?: Condo
+                 When do you need this job to start?: Within a few days
+                 Send a message to the pro: Bathroom faucet dripping
+                 constantly.
+                 Zip: 44113
+                 Phone: (216) 555-0355
+       expected: a routine lead. Denise has a dripping bathroom faucet.
+                 Two appointment windows, no alarm.
+       got     : >>> FOR THE PLUMBER: EMERGENCY - CALL NOW
+                 Job      : Flooding
+                 Said     : "Bathroom faucet dripping constantly."
+                 and she was told:
+                 "Thanks for reaching out about your flooding issue -
+                  that sounds urgent, so I've flagged it straight away."
+                 NO APPOINTMENT TIMES WERE OFFERED.
+       why : the word "flooded" appears in the QUESTION Thumbtack asks -
+                 "Is any part of the building currently flooded?" - and
+                 she answered No. The agent hunted for emergency words
+                 across the whole email and found it in the question.
+                 The same question also produced the job type "Flooding".
+       why it matters : WORSE THAN THE C6 FALSE ALARM, for two reasons.
+                 First, the alert contradicts itself in the same breath -
+                 "Job: Flooding" directly above her own words "Bathroom
+                 faucet dripping constantly". Second, that question is
+                 part of Thumbtack's standard form, so this fires on
+                 EVERY Thumbtack lead, not occasionally. The plumber gets
+                 a CALL NOW FLOODING alarm for a dripping tap, then a
+                 leaky toilet, then a slow drain - and by the fourth one
+                 he ignores the alerts entirely. That is the week
+                 somebody's basement actually floods.
+                 And Denise, a perfectly bookable job, was denied
+                 appointment times and downgraded into a phone call.
+
+       *** FIXED 15 August 2026, within the hour. ***
+       Emergency words and job words are now looked for ONLY in what the
+       customer wrote - their answers and their message - never in the
+       questions and labels the form printed. A form label is identical
+       on every submission whether the customer is standing in six
+       inches of water or asking about a tap, so it can never be
+       evidence about THIS customer.
+
+       Roshan's instruction was that the theoretical downside - a real
+       emergency word appearing ONLY in a label - must not exist. It
+       does not: the separate, certain check is untouched. A form that
+       ASKS whether the building is flooded and gets "Yes" back is still
+       an emergency, and always was. The label was never the evidence;
+       the answer is.
+
+       GUARDED BY THREE NEW CHECKS in Part 1 above:
+         50. A form QUESTION containing an emergency word, answered No
+         51. The same form question, answered YES, is still an emergency
+         52. An emergency the customer describes in their own answer
+
+       RE-TESTED ON LIVE GMAIL, 15 August 2026 at 1:42PM. The same
+       Thumbtack email sent again, unchanged. Result:
+           Subject: Re: your faucet issue
+           "Thanks for reaching out about your faucet issue.
+            I can get someone out to you:
+              1 - Monday 8-10am
+              2 - Monday 10am-12pm"
+       No emergency alert. No mention of flooding. Job logged as Faucet.
+       CONFIRMED FIXED ON LIVE MAIL.
+       It also asked her no extra question, correctly - Thumbtack gave
+       the zip, so there was nothing left worth asking.
+
+[pass] D4. An Angi-style lead
+       fed in  : a form splitting the name across two fields -
+                 First Name: Tomas / Last Name: Reyes, plus five
+                 questions phrased as sentences, a full street address
+                 and a project description.
+       expected: the name read as "Tomas Reyes", not just "Tomas".
+       got     : "Tomas Reyes". Job "Sump Pump" from the answers.
+                 Address "4180 Oak Ridge Rd, Cleveland OH 44121" and
+                 timing "Within a week" both captured.
+       also    : it asked NO extra question, correctly - Angi already
+                 gave the address and the timing, so there was nothing
+                 left worth asking.
+
+[pass] D5. A job we never taught it
+       fed in  : Name: Frank Osei / Service Needed: Water Softener
+                 Service / Message: The salt tank has not been going
+                 down.
+       expected: use "water softener service" in the reply even though
+                 those words are not in the agent's list, because the
+                 form said so directly.
+       got     : "Re: your water softener service". It trusted the form
+                 over its own vocabulary, which is right - the word list
+                 is a fallback for when nobody told us, not a filter on
+                 what a plumbing job is allowed to be.
+
+----------------------------------------------------------------------
+  GROUP D TOTALS: 5 checked, 4 passed, 1 failed (D3)
+  D3 was fixed within the hour and RE-PROVEN ON LIVE GMAIL the same
+  afternoon. Group D is fully closed - 5 of 5 now behave correctly on
+  real mail. The FAILED mark stays because that is what happened.
+----------------------------------------------------------------------
+
+  TWO OF THE FIVE WERE EXPECTED TO FAIL AND DID NOT. D1 and D2 were
+  both on the known-weak-spots list, and both passed because of fixes
+  made earlier the same day. The one that failed, D3, was the one
+  nobody had flagged as a risk at all.
+
+----------------------------------------------------------------------
+======================================================================
+  PART 3, GROUP E - MESSY SHAPES REAL PEOPLE PRODUCE
+  The last group. Six emails.
+
+  Run on 15 August 2026 at 1:53PM (laptop time)
+  Client time reported: Saturday 15 Aug, 04:23AM EDT. Practice mode.
+======================================================================
+
+[FAIL] E1. Written in capitals
+       fed in  : a form with EVERYTHING in capitals, including the email
+                 address - somebody with caps lock on does not carefully
+                 switch it off for one field -
+            Subject: NEW CONTACT FORM SUBMISSION
+
+            NAME: WALTER KIM
+            PHONE: (216) 555-0955
+            EMAIL: W.KIM@EXAMPLE.COM
+            SERVICE NEEDED: SEWER LINE INSPECTION
+       expected: the capitalised labels recognised, the reply sent to
+                 W.KIM@EXAMPLE.COM, and the greeting to read
+                 "Hi Walter," - NOT "Hi WALTER,".
+       got     : labels recognised correctly. Reply correctly addressed
+                 to W.KIM@EXAMPLE.COM. Job read as sewer line inspection.
+                 BUT THE GREETING READ:
+                     "Hi WALTER,"
+                 IT SHOULD HAVE READ:
+                     "Hi Walter,"
+                 and leads.csv records him as "WALTER KIM" with the job
+                 "SEWER LINE INSPECTION", both shouting.
+       why it matters : the agent copied his shouting straight back at
+                 him. It reads like being yelled at by a machine, on the
+                 first contact a customer ever has with the business.
+                 And the plumber's lead list - the file he opens every
+                 day - looks like a ransom note.
+                 Nothing was lost or mis-read. This is entirely about
+                 presentation, which is the whole product when the
+                 product is a reply that should feel handwritten.
+       *** FIXED 16 August 2026 and RE-PROVEN ON LIVE GMAIL 17 August. ***
+       When a name or job arrives ENTIRELY in capitals it is now given
+       normal capitalisation. Only when it is entirely capitals, so a
+       name that already has small letters in it is never "corrected".
+
+       ONE THING WE HAD NOT DISCUSSED, added while building it: some
+       words are SUPPOSED to shout. Blind conversion would have turned
+       "HVAC REPAIR" into "Hvac Repair" - and Maria's entire business is
+       HVAC. Known acronyms stay uppercase.
+
+       Live re-test, 17 August: the reply opened "Hi Walter," and
+       leads.csv recorded "Walter Kim" / "Sewer Line Inspection".
+
+       GUARDED BY THREE NEW CHECKS in Part 1 above:
+         53. A form filled in entirely with caps lock on
+         54. An acronym is still allowed to shout
+         55. A name that already has small letters is left alone
+
+[FAIL] E2. Two phone numbers
+       fed in  : Name: Ian Prescott / Phone: (216) 555-0733 /
+                 Email: ian.prescott@example.com /
+                 Service Needed: Leak Detection /
+                 Message: Call my mobile 216-555-0801 if the house phone
+                 doesn't answer.
+       expected: the LABELLED number to win - (216) 555-0733 - with the
+                 mobile kept as a second contact.
+       got     : the important part worked. Phone (216) 555-0733.
+                 Other phone 216-555-0801, marked "also given".
+                 BUT THE NOTE EXPLAINING IT READ:
+                     "com Leak Detection Call my mobile 216-555-0801 if
+                      the house phone doesn't answer."
+                 IT SHOULD HAVE READ:
+                     "Call my mobile 216-555-0801 if the house phone
+                      doesn't answer."
+       why : this fault was introduced EARLIER THE SAME DAY. To capture
+                 Rita's "call my landlord if I don't pick up", the agent
+                 was taught to ignore line breaks when grabbing the
+                 customer's sentence, because mail programs wrap long
+                 sentences wherever they like. On a FORM that is wrong:
+                 it ran backwards past the start of the message, swept up
+                 the tail of the email address and the words "Leak
+                 Detection", and glued them onto the front.
+       why it matters : it does not lose the job - the numbers are both
+                 correct. But the plumber reads a note that opens with
+                 nonsense, in the file he looks at every day. It makes a
+                 working product look sloppy.
+       *** FIXED 16 August 2026 and RE-PROVEN ON LIVE GMAIL 17 August. ***
+       The agent now marks where each form field begins, so it can tell
+       the two kinds of line break apart:
+         - inside a message : a wrap put there by the mail program.
+                              Keep reading.
+         - between fields   : the edge of a box. Stop.
+       A sentence cannot start in one box and finish in another.
+
+       THE RISK WAS BREAKING RITA. Ignoring line breaks was added the
+       day before precisely so that her instruction - wrapped across two
+       lines by her mail program - was captured whole. Fixing Ian could
+       easily have re-broken her. There is now a check for each, and
+       both pass.
+
+       Live re-test, 17 August: leads.csv records the note as
+           "Call my mobile 216-555-0801 if the house phone doesn't
+            answer."
+       starting at "Call", with the main number (216) 555-0733 and the
+       mobile 216-555-0801 marked "also given".
+
+       GUARDED BY TWO NEW CHECKS in Part 1 above:
+         56. The note about a second number stays inside its own field
+         57. A wrapped sentence in free text is still kept whole
+
+[pass] E3. Somebody else's email in the message
+       fed in  : Name: Owen Fletcher / Email: owen.f@example.com /
+                 Message: I rent - my landlord is
+                 manager@bigrealty.example.com, copy him if there's a
+                 cost.
+       expected: the reply goes to OWEN, not the landlord.
+       got     : reply written to owen.f@example.com. The landlord's
+                 address was ignored entirely. Correct.
+       note    : this is the email-address twin of the phone rule added
+                 earlier the same day. Neither the landlord's number nor
+                 his address gets mistaken for the customer's.
+
+[pass] E4. Colons inside the customer's writing
+       fed in  : Message: Here's the problem: the shower runs cold after
+                 2 minutes.
+                 Times that suit: mornings, any day
+       expected: not to be confused by colons inside ordinary sentences.
+                 A colon is how form fields are written, so a customer
+                 using one in a sentence can look exactly like a label.
+       got     : job read as Shower, reply "Re: your shower issue", and
+                 the sentence was not chopped into a fake field. Correct.
+       BUT WORTH KNOWING : "Times that suit: mornings, any day" was NOT
+                 captured as her preferred timing. Nothing was lost today
+                 because she was not asked about timing either - the
+                 agent only ever asks one question and it asked for the
+                 zip. But it is information the plumber would have liked.
+                 Not a fault. Worth a look when the AI step is built,
+                 since understanding free-text preferences is exactly
+                 what that step is for.
+
+[pass] E5. Form questions we have never seen
+       fed in  : How did you hear about us?: Facebook /
+                 Do you own or rent?: Own /
+                 Preferred technician: no preference /
+                 plus the ordinary name, phone, email and service fields.
+       expected: the three unfamiliar lines ignored harmlessly.
+       got     : ignored. Name, phone, email and "Faucet Replacement" all
+                 read correctly. Correct.
+
+[pass] E6. An out-of-office auto-reply
+       fed in  : Subject: Automatic reply: Your enquiry
+                 I am out of the office until August 24th with limited
+                 access to email. For urgent matters please call
+                 216-555-0400.
+       expected: SILENCE. No reply, no spreadsheet row.
+       got     : SKIP_AUTO, reason "machine-generated message". Nothing
+                 written anywhere. Correct.
+       why it matters : if the agent answers an out-of-office message,
+                 that machine answers back, and two mail servers talk to
+                 each other until Google flags the CLIENT's real business
+                 domain as a spammer. This is the single most damaging
+                 thing the agent could do, and it is firmly shut.
+
+----------------------------------------------------------------------
+  GROUP E TOTALS: 6 checked, 4 passed, 2 failed (E1 and E2)
+  Neither failure lost a job. Both were presentation faults - one in
+  front of the customer, one in the plumber's own records. BOTH FIXED
+  on 16 August and RE-PROVEN ON LIVE GMAIL on 17 August.
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+  PART 3 TOTALS: 36 checked, 29 passed, 7 failed
+  (Group A: 5, Group B: 7, Group S: 2, Group C: 11, Group D: 5,
+   Group E: 6)
+
+  ALL FIVE REAL-EMAIL GROUPS HAVE NOW BEEN SENT, AND EVERY FAULT THEY
+  FOUND IS FIXED AND RE-PROVEN ON LIVE GMAIL as of 17 August 2026.
+
+  All 7 marked FAILED stay marked, because that is what happened. Every
+  one of the 7 was found by sending real mail by hand. NOT ONE was found
+  by an automated test - the automated tests' job was to stop the fixes
+  from breaking anything else, and they did that 12 times over.
+
+  Two of the 7 faults were CREATED by the fixes for earlier ones, and
+  were caught only because the same emails were sent again afterwards.
+  That is the habit worth keeping: a fix is not finished until the
+  original email has been re-sent and seen to behave.
+
+  THE RULES-BASED AGENT IS NOW COMPLETE.
+----------------------------------------------------------------------
+
+WHAT PART 3 MEANS IN PLAIN ENGLISH
+
+  The agent worked, end to end, on real email for the first time. It
+  logged into a real Gmail account, found messages it had never seen,
+  read them, decided who was a genuine customer, wrote a sensible reply
+  to each one in the plumber's own time zone, and wrote everything down
+  where the plumber can find it. Nothing was sent to anybody.
+
+  Group B then proved that none of the eleven bugs already fixed have
+  crept back in, including the two silent-failure ones that are the most
+  dangerous in the whole product.
+
+  Nothing failed in either round. But sending Group B by hand uncovered
+  a hole no test could have found - mail the agent never gets to see at
+  all. That is written up at the end of Group B above.
+
+THREE THINGS WORTH KNOWING, NONE OF THEM A FAILURE
+
+  1. All three customers were offered the SAME two slots - today 8-10am
+     and today 10am-12pm. That is correct behaviour today, because the
+     agent cannot yet see the plumber's diary. But it means if five
+     customers write in overnight, all five are pushed at the same two
+     slots and the plumber ends up double or triple booked. This is the
+     calendar step we deliberately deferred, showing up in real output
+     for the first time. It is the reason firm auto-booking must not be
+     sold to a client until the calendar is connected.
+
+  2. THE ZIP CODE ONLY GOT US HALF THE ADDRESS.  ***FIXED 18 AUGUST***
+     Spotted by Roshan reading this output on 13 August 2026. No test
+     caught it, because no test was looking for it.
+
+     In the United States a zip code is five digits naming a postal
+     area. It does NOT include the street or the house number. So when a
+     customer gave no address, the agent ended up knowing roughly which
+     neighbourhood they were in and nothing more - the plumber still
+     could not drive to them.
+
+     The old decision was to ask the zip first anyway, on the grounds
+     that a stranger might not want to hand over their home address in
+     the first message, and collect the street later in the AI step.
+
+     REVERSED 18 August 2026. The agent now asks for the FULL STREET
+     ADDRESS in the first reply, and offers NO appointment times until
+     it has one.
+
+     Why it was reversed: working out how long the plumber takes to
+     drive there, and whether the customer is even inside his service
+     area, BOTH need a street address - and both have to be settled
+     before a time is promised. Under the old order the address arrived
+     after the slot had been offered, which was circular. Roshan's
+     clinching argument was traffic: zip codes cannot see it, so a
+     journey the agent thinks is 30 minutes becomes an hour in the rain,
+     the plumber misses the window, and the customer blames him.
+
+     Why the privacy worry was overweighted: someone contacting a
+     plumber is asking a stranger to come to their house. The address IS
+     the job. And the agent now gives the reason when it asks - "we
+     check it's inside the area we cover, and it lets us give you an
+     arrival time we can actually keep."
+
+     Six new reply-engine checks guard this. The old emails further up
+     this file still show "Also, what's your zip code?" - that is the
+     record of what was actually sent between 13 and 17 August, and it
+     stays as it happened.
+
+  3. leads.csv still has a leftover row at the top from an earlier
+     session - a made-up customer called Dave Harris. Nothing is wrong
+     with the agent; it is old practice data. Worth clearing before that
+     file is ever shown to a real client, so they do not see invented
+     customers in their own lead list.
+
+STILL TO TEST BY HAND (from emails-to-send-by-hand.md)
+
+  GROUP C - things only real email can break: attachments, signatures,
+            bold formatting, deep reply chains, emoji, accented names.
+            Includes C2b, the hard one, which is EXPECTED TO FAIL by
+            taking an office switchboard number out of a signature
+            instead of the mobile the customer actually gave.
+  GROUP D - the known weak spots we already expect to be imperfect
+  GROUP E - messy shapes real people produce
+
+======================================================================
+  GRAND TOTAL ACROSS ALL THREE PARTS
+  57 parser + 92 reply engine + 42 diary/driving + 36 real-email
+  = 227 checked, 220 passed, 7 FAILED
+  (all 7 failures are in the real-email record, all since fixed and
+   re-proven on live Gmail)
+
+  PART 2B IS NEW, added 19-20 August 2026. 38 checks covering the two
+  things the agent could not do before: knowing WHERE the customer is,
+  and knowing WHEN the plumber is actually free.
+
+  Two of those checks exist because the code failed them first:
+
+    "the outer suburbs are reachable, not rejected" - with the driving
+    speed set to 30mph, the agent decided Bay Village (15 miles from
+    downtown Cleveland, a 20 minute run on I-90) was a 35 minute drive
+    and told the customer they were outside the service area. Joe would
+    have lost every job in the outer suburbs and never known why.
+
+    "the booked hour and the drive around it are both skipped" - the
+    agent found Joe free at 10:30 and rounded it up to 11:00, throwing
+    away half an hour of his day. The half-hour appointment grid had
+    been decided but never actually built.
+
+  The reply engine gained 9 checks on 18 August 2026, and 11 existing
+  ones had their expected answers rewritten. Three things changed:
+
+  1. THE FULL STREET ADDRESS COMES FIRST. The agent asks for it and
+     offers NO appointment times until it has one. The old behaviour -
+     ask only for the zip, offer times anyway, collect the street later
+     - is gone. Six new checks prove it asks for the street, offers no
+     times, computes no windows behind the scenes, explains WHY it is
+     asking, never mentions the zip again, and still books ordinary
+     leads normally.
+
+  2. ARRIVAL WINDOWS ARE NOW 1 HOUR, not 2. A window promises when the
+     plumber TURNS UP, not when he finishes, so the agent must assume he
+     arrives at the last moment it allows. A wider window means more of
+     his day held back. One hour hands him back roughly an hour per job.
+
+  3. JOE NOW HAS A LUNCH BREAK, 12-1. Until today both lunch settings
+     were blank, so the agent believed he worked 8 to 5 without eating.
+     The test "6am waits for opening time plus his notice period" had
+     been EXPECTING "today 12-2pm" - a window running straight through
+     the lunch hour - and passing. Three new checks now guard it: no
+     window straddles the hour, a window may finish exactly at 12, and
+     the next one starts at 1.
+
+  All 7 failures are in the real-email part, and all were found by
+  sending real mail by hand - not one was found by an automated test.
+  All 7 are now fixed and re-proven on live Gmail, including E1 (the
+  agent shouting a customer's name back at him) and E2 (the note about
+  a second phone number reading as nonsense) - both fixed 16 August and
+  re-proven on live Gmail 17 August. [Corrected 24 Aug 2026: this
+  paragraph previously said E1/E2 were "still open," contradicting the
+  detailed record above showing both fixed. Documentation bug only -
+  no code was affected.]
+
+  The 4 marked FAILED are the Group C record as it happened. All four
+  have since been re-sent as real emails and passed - see the re-test
+  section. They stay marked as they happened, because a test log that
+  quietly rewrites its own history is no use to anybody.
+
+  The 4 failures are the Group C record as it happened on 15 August.
+  All four are now fixed and guarded by automated checks - 23 new
+  parser checks were added the same day, taking the parser suite from
+  24 to 47. The Group C entries stay marked FAILED until each one has
+  been re-sent as a real email and seen to pass on live Gmail.
+
+  The four failures are all in Group C and are all real. See
+  "WHAT GROUP C MEANS IN PLAIN ENGLISH" above.
+
+  The reply engine gained 10 checks on 13 August 2026: 7 covering the
+  hidden reference number that attaches a reply to the customer's own
+  email (see "the envelope" in Part 2), and 3 covering job names that
+  describe what is not working rather than naming a thing.
+======================================================================
